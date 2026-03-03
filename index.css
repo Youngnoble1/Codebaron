@@ -1,0 +1,42 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-serif: "Cinzel", serif;
+}
+
+:root {
+  --gold: #d4af37;
+  --deep-blue: #050b18;
+}
+
+body {
+  background-color: var(--deep-blue);
+  color: #e2e8f0;
+  font-family: var(--font-sans);
+}
+
+.font-cinzel {
+  font-family: var(--font-serif);
+}
+
+.gold-gradient {
+  background: linear-gradient(135deg, #d4af37 0%, #f9d976 50%, #d4af37 100%);
+}
+
+.gold-text-gradient {
+  background: linear-gradient(135deg, #d4af37 0%, #f9d976 50%, #d4af37 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.glass-card {
+  background: rgba(15, 23, 42, 0.7);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(212, 175, 55, 0.2);
+}
+
+.nav-blur {
+  background: rgba(5, 11, 24, 0.85);
+  backdrop-filter: blur(8px);
+}

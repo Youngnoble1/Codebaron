@@ -1,0 +1,329 @@
+
+import React, { useState, useEffect } from 'react';
+import { User, GameMode, Category } from './types';
+import { GAME_MODES, TRIVIA_CATEGORIES, ACADEMIC_SUBJECTS } from './constants';
+import Auth from './components/Auth';
+import Navigation from './components/Navigation';
+import GameView from './components/GameView';
+import ProfileView from './components/ProfileView';
+import LeaderboardView from './components/LeaderboardView';
+
+const App: React.FC = () => {
+  const [user, setUser] = useState<User | null>(null);
+  const [activeTab, setActiveTab] = useState('home');
+  const [currentGame, setCurrentGame] = useState<{ mode: GameMode; category?: Category } | null>(null);
+  const [showAcademicMenu, setShowAcademicMenu] = useState(false);
+  const [showUMEMenu, setShowUMEMenu] = useState(false);
+  const [showSSCEMenu, setShowSSCEMenu] = useState(false);
+  const [showSpecialistMenu, setShowSpecialistMenu] = useState(false);
+
+  // Initialize from storage
+  useEffect(() => {
+    // Clear old mismatched JAMB and SSCE cache
+    localStorage.removeItem('revgame_q_cache_UME');
+    localStorage.removeItem('revgame_q_cache_SSCE');
+    
+    const saved = localStorage.getItem('revgame_active_user');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        setUser(parsed);
+      } catch (e) {
+        console.error("Failed to parse saved user", e);
+      }
+    }
+  }, []);
+
+  const handleLogin = (newUser: User) => {
+    setUser(newUser);
+    localStorage.setItem('revgame_active_user', JSON.stringify(newUser));
+  };
+
+  const handleLogout = () => {
+    // Before logging out, we could perform one final sync if needed, 
+    // but handleUpdateUser ensures everything is saved immediately.
+    setUser(null);
+    localStorage.removeItem('revgame_active_user');
+    setActiveTab('home');
+  };
+
+  const handleUpdateUser = (updates: Partial<User>) => {
+    if (!user) return;
+    
+    // Create the updated state
+    const updatedUser = { ...user, ...updates };
+    setUser(updatedUser);
+    
+    // Persist session
+    localStorage.setItem('revgame_active_user', JSON.stringify(updatedUser));
+    
+    // Update global user repository
+    const usersJson = localStorage.getItem('revgame_users');
+    const users = JSON.parse(usersJson || '[]');
+    const updatedUsers = users.map((u: any) => u.id === user.id ? { ...u, ...updates } : u);
+    localStorage.setItem('revgame_users', JSON.stringify(updatedUsers));
+  };
+
+  const handleGameEnd = (stats: { score: number; streak: number; won: boolean }) => {
+    if (!user || !currentGame) return;
+
+    const currentCat = currentGame.category || 'General Knowledge';
+    const newPlayCount = { ...user.playCount };
+    newPlayCount[currentCat] = (newPlayCount[currentCat] || 0) + 1;
+
+    // Recalculate favorite category
+    const favCat = Object.entries(newPlayCount).reduce((a, b) => a[1] > b[1] ? a : b, [currentCat, 0])[0] as Category;
+
+    handleUpdateUser({
+      royaltyPoints: user.royaltyPoints + stats.score,
+      highestScore: Math.max(user.highestScore, stats.score),
+      longestStreak: Math.max(user.longestStreak, stats.streak),
+      playCount: newPlayCount,
+      favoriteCategory: favCat
+    });
+
+    if (stats.won) {
+      const win = window as any;
+      if (win.confetti) {
+        win.confetti({
+          particleCount: 200,
+          spread: 70,
+          origin: { y: 0.6 },
+          colors: ['#d4af37', '#f9d976', '#ffffff']
+        });
+      }
+    }
+
+    setCurrentGame(null);
+    setShowAcademicMenu(false);
+    setShowUMEMenu(false);
+    setShowSSCEMenu(false);
+    setShowSpecialistMenu(false);
+  };
+
+  if (!user) {
+    return <Auth onLogin={handleLogin} />;
+  }
+
+  if (currentGame) {
+    return (
+      <GameView 
+        mode={currentGame.mode} 
+        category={currentGame.category} 
+        user={user}
+        onGameEnd={handleGameEnd}
+        onExit={(stats) => {
+          // If the player exits early, still save their current score and streak
+          if (stats && stats.score > 0) {
+            handleGameEnd({ ...stats, won: false });
+          } else {
+            setCurrentGame(null);
+          }
+        }}
+      />
+    );
+  }
+
+  const renderContent = () => {
+    switch (activeTab) {
+      case 'leaderboard':
+        return <LeaderboardView />;
+      case 'profile':
+        return <ProfileView user={user} onUpdateUser={handleUpdateUser} onLogout={handleLogout} />;
+      default:
+        return (
+          <div className="p-6 pb-32 animate-in fade-in duration-500">
+            <header className="flex justify-between items-center mb-10">
+              <div>
+                <h1 className="text-3xl font-cinzel gold-text-gradient font-bold">REVGAME</h1>
+                <p className="text-gray-400 text-xs tracking-[0.2em] font-bold">THE ELITE TRIVIA ARENA</p>
+              </div>
+              <div 
+                onClick={() => setActiveTab('profile')}
+                className="w-12 h-12 rounded-full border-2 border-[#d4af37] p-0.5 cursor-pointer hover:scale-110 transition-transform active:scale-95 overflow-hidden shadow-lg shadow-yellow-500/10"
+              >
+                <img src={user.avatar} className="w-full h-full rounded-full object-cover bg-slate-800" alt="Profile" />
+              </div>
+            </header>
+
+            <div className="mb-8">
+              <h2 className="text-sm font-bold tracking-widest text-[#d4af37] uppercase mb-4">Core Challenges</h2>
+              <div className="grid grid-cols-1 gap-4">
+                {GAME_MODES.slice(0, 4).map((mode) => (
+                  <button
+                    key={mode.id}
+                    onClick={() => {
+                      if (mode.id === GameMode.CATEGORY) {
+                        setShowSpecialistMenu(!showSpecialistMenu);
+                        setShowAcademicMenu(false);
+                        setShowUMEMenu(false);
+                        setShowSSCEMenu(false);
+                      } else {
+                        setCurrentGame({ mode: mode.id, category: 'General Knowledge' });
+                      }
+                    }}
+                    className={`group relative overflow-hidden glass-card p-6 rounded-2xl border border-yellow-500/10 flex items-center gap-6 transition-all duration-300 hover:border-[#d4af37]/50 hover:bg-slate-800/50 active:scale-[0.98] ${showSpecialistMenu && mode.id === GameMode.CATEGORY ? 'border-[#d4af37]/50 bg-slate-800/50' : ''}`}
+                  >
+                    <div className="p-4 bg-slate-900 rounded-xl group-hover:scale-110 transition-transform border border-slate-800">
+                      {mode.icon}
+                    </div>
+                    <div className="flex-1 text-left">
+                      <h3 className="text-lg font-bold font-cinzel group-hover:text-[#d4af37] transition-colors">{mode.title}</h3>
+                      <p className="text-sm text-gray-500">{mode.description}</p>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {showSpecialistMenu && (
+              <div className="mb-8 p-4 bg-slate-900/50 rounded-2xl border border-[#d4af37]/30 animate-in slide-in-from-top-4">
+                <div className="flex justify-between items-center mb-3">
+                  <h3 className="text-xs font-bold text-gray-400 uppercase">Choose Trivia Niche</h3>
+                  <button onClick={() => setShowSpecialistMenu(false)} className="text-[10px] text-gray-500 hover:text-[#d4af37]">Close</button>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  {TRIVIA_CATEGORIES.map(cat => (
+                    <button 
+                      key={cat}
+                      onClick={() => setCurrentGame({ mode: GameMode.CATEGORY, category: cat })}
+                      className="p-3 text-xs font-bold text-white bg-slate-800 rounded-lg hover:bg-[#d4af37] hover:text-[#050b18] transition-all truncate border border-slate-700 hover:border-[#d4af37]"
+                    >
+                      {cat}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div className="mb-8">
+              <h2 className="text-sm font-bold tracking-widest text-[#d4af37] uppercase mb-4">Academic Excellence</h2>
+              <button
+                onClick={() => {
+                  setShowAcademicMenu(!showAcademicMenu);
+                  setShowSpecialistMenu(false);
+                  setShowUMEMenu(false);
+                  setShowSSCEMenu(false);
+                }}
+                className={`group w-full relative overflow-hidden glass-card p-6 rounded-2xl border border-purple-500/30 flex items-center gap-6 transition-all duration-300 hover:border-purple-400/50 hover:bg-slate-800/50 active:scale-[0.98] ${showAcademicMenu ? 'bg-slate-800/80 border-purple-400' : ''}`}
+              >
+                <div className="p-4 bg-slate-900 rounded-xl group-hover:scale-110 transition-transform border border-slate-800">
+                  {GAME_MODES[4].icon}
+                </div>
+                <div className="flex-1 text-left">
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-lg font-bold font-cinzel group-hover:text-purple-400 transition-colors">{GAME_MODES[4].title}</h3>
+                    <div className="bg-purple-500/20 text-purple-400 text-[8px] font-bold px-1.5 py-0.5 rounded uppercase border border-purple-500/30">New</div>
+                  </div>
+                  <p className="text-sm text-gray-500">{GAME_MODES[4].description}</p>
+                </div>
+              </button>
+            </div>
+
+            {showAcademicMenu && (
+              <div className="grid grid-cols-2 gap-3 animate-in slide-in-from-top-4 mb-10">
+                {ACADEMIC_SUBJECTS.map((cat) => (
+                  <button
+                    key={cat}
+                    onClick={() => setCurrentGame({ mode: GameMode.ACADEMIC, category: cat })}
+                    className="glass-card p-4 rounded-xl text-left border border-slate-800 hover:border-purple-500/50 transition-all active:scale-[0.98]"
+                  >
+                    <div className="text-[10px] text-gray-400 font-bold uppercase mb-1 truncate">{cat}</div>
+                    <div className="text-xs font-bold text-purple-400">Challenge Now</div>
+                  </button>
+                ))}
+              </div>
+            )}
+
+            <div className="mb-8">
+              <h2 className="text-sm font-bold tracking-widest text-[#d4af37] uppercase mb-4">National Examinations</h2>
+              <div className="grid grid-cols-1 gap-4">
+                {/* JAMB u.m.e */}
+                <button
+                  onClick={() => {
+                    setShowUMEMenu(!showUMEMenu);
+                    setShowAcademicMenu(false);
+                    setShowSSCEMenu(false);
+                    setShowSpecialistMenu(false);
+                  }}
+                  className={`group relative overflow-hidden glass-card p-6 rounded-2xl border border-blue-500/30 flex items-center gap-6 transition-all duration-300 hover:border-blue-400/50 hover:bg-slate-800/50 active:scale-[0.98] ${showUMEMenu ? 'bg-slate-800/80 border-blue-400' : ''}`}
+                >
+                  <div className="p-4 bg-slate-900 rounded-xl group-hover:scale-110 transition-transform border border-slate-800">
+                    {GAME_MODES[5].icon}
+                  </div>
+                  <div className="flex-1 text-left">
+                    <h3 className="text-lg font-bold font-cinzel group-hover:text-blue-400 transition-colors">{GAME_MODES[5].title}</h3>
+                    <p className="text-sm text-gray-500">{GAME_MODES[5].description}</p>
+                  </div>
+                  <div className="bg-blue-500/20 text-blue-400 text-[8px] font-bold px-1.5 py-0.5 rounded uppercase border border-blue-500/30">Past Qs</div>
+                </button>
+
+                {showUMEMenu && (
+                  <div className="grid grid-cols-2 gap-3 animate-in slide-in-from-top-4 my-2">
+                    {ACADEMIC_SUBJECTS.map((cat) => (
+                      <button
+                        key={cat}
+                        onClick={() => setCurrentGame({ mode: GameMode.UME, category: cat })}
+                        className="glass-card p-4 rounded-xl text-left border border-slate-800 hover:border-blue-500/50 transition-all active:scale-[0.98]"
+                      >
+                        <div className="text-[10px] text-gray-400 font-bold uppercase mb-1 truncate">{cat}</div>
+                        <div className="text-xs font-bold text-blue-400">Start JAMB</div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                {/* S.S.C.E Mastery */}
+                <button
+                  onClick={() => {
+                    setShowSSCEMenu(!showSSCEMenu);
+                    setShowAcademicMenu(false);
+                    setShowUMEMenu(false);
+                    setShowSpecialistMenu(false);
+                  }}
+                  className={`group relative overflow-hidden glass-card p-6 rounded-2xl border border-orange-500/30 flex items-center gap-6 transition-all duration-300 hover:border-orange-400/50 hover:bg-slate-800/50 active:scale-[0.98] ${showSSCEMenu ? 'bg-slate-800/80 border-orange-400' : ''}`}
+                >
+                  <div className="p-4 bg-slate-900 rounded-xl group-hover:scale-110 transition-transform border border-slate-800">
+                    {GAME_MODES[6].icon}
+                  </div>
+                  <div className="flex-1 text-left">
+                    <h3 className="text-lg font-bold font-cinzel group-hover:text-orange-400 transition-colors">{GAME_MODES[6].title}</h3>
+                    <p className="text-sm text-gray-500">{GAME_MODES[6].description}</p>
+                  </div>
+                  <div className="bg-orange-500/20 text-orange-400 text-[8px] font-bold px-1.5 py-0.5 rounded uppercase border border-orange-500/30">Past Qs</div>
+                </button>
+
+                {showSSCEMenu && (
+                  <div className="grid grid-cols-2 gap-3 animate-in slide-in-from-top-4 my-2">
+                    {ACADEMIC_SUBJECTS.map((cat) => (
+                      <button
+                        key={cat}
+                        onClick={() => setCurrentGame({ mode: GameMode.SSCE, category: cat })}
+                        className="glass-card p-4 rounded-xl text-left border border-slate-800 hover:border-orange-500/50 transition-all active:scale-[0.98]"
+                      >
+                        <div className="text-[10px] text-gray-400 font-bold uppercase mb-1 truncate">{cat}</div>
+                        <div className="text-xs font-bold text-orange-400">Start SSCE</div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        );
+    }
+  };
+
+  return (
+    <div className="min-h-screen relative max-w-md mx-auto bg-[#050b18] overflow-x-hidden border-x border-slate-800 shadow-[0_0_100px_rgba(212,175,55,0.05)]">
+      {renderContent()}
+      <Navigation activeTab={activeTab} onTabChange={(tab) => {
+        setActiveTab(tab);
+        setShowAcademicMenu(false);
+        setShowSpecialistMenu(false);
+      }} />
+    </div>
+  );
+};
+
+export default App;
