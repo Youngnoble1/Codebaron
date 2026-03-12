@@ -1,7 +1,8 @@
 
 import React, { useState, useEffect } from 'react';
-import { LeaderboardEntry, User } from '../types';
+import { LeaderboardEntry } from '../types';
 import { ICONS } from '../constants';
+import { db, collection, query, orderBy, limit, onSnapshot, handleFirestoreError, OperationType } from '../firebase';
 
 const LeaderboardView: React.FC = () => {
   const [leaders, setLeaders] = useState<LeaderboardEntry[]>([]);
@@ -9,35 +10,24 @@ const LeaderboardView: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const fetchLeaders = () => {
-      setLoading(true);
-      setError(null);
-      try {
-        const usersJson = localStorage.getItem('revgame_users');
-        const users: User[] = JSON.parse(usersJson || '[]');
-        
-        // Sort by royalty points descending and take top 10
-        const sortedLeaders: LeaderboardEntry[] = users
-          .sort((a, b) => b.royaltyPoints - a.royaltyPoints)
-          .slice(0, 10)
-          .map(u => ({
-            id: u.id,
-            username: u.username,
-            royaltyPoints: u.royaltyPoints,
-            highestScore: u.highestScore,
-            avatar: u.avatar
-          }));
-        
-        setLeaders(sortedLeaders);
-      } catch (err) {
-        console.error("Failed to fetch leaderboard data", err);
-        setError("Failed to load rankings. Please try again.");
-      } finally {
-        setLoading(false);
-      }
-    };
+    const q = query(collection(db, 'leaderboard'), orderBy('royaltyPoints', 'desc'), limit(10));
+    
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const sortedLeaders: LeaderboardEntry[] = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      } as LeaderboardEntry));
+      
+      setLeaders(sortedLeaders);
+      setLoading(false);
+    }, (err) => {
+      console.error("Leaderboard snapshot error", err);
+      handleFirestoreError(err, OperationType.LIST, 'leaderboard');
+      setError("Failed to load rankings. Please try again.");
+      setLoading(false);
+    });
 
-    fetchLeaders();
+    return () => unsubscribe();
   }, []);
 
   if (loading) {

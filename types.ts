@@ -6,7 +6,9 @@ export enum GameMode {
   SURVIVAL = 'SURVIVAL',
   ACADEMIC = 'ACADEMIC',
   UME = 'UME',
-  SSCE = 'SSCE'
+  SSCE = 'SSCE',
+  MULTIPLAYER = 'MULTIPLAYER',
+  REVELATIONS = 'REVELATIONS'
 }
 
 export type Category = 
@@ -24,7 +26,8 @@ export type Category =
   | 'Pop Culture'
   | 'Science & Nature'
   | 'History'
-  | 'Geography (General)';
+  | 'Geography (General)'
+  | 'Revelations';
 
 export interface Question {
   id: string;
@@ -46,6 +49,8 @@ export interface User {
   favoriteCategory: Category;
   avatar: string;
   playCount: Record<string, number>;
+  role?: 'player' | 'admin';
+  createdAt?: any;
 }
 
 export interface GameState {
@@ -69,4 +74,23 @@ export interface LeaderboardEntry {
   royaltyPoints: number;
   highestScore: number;
   avatar: string;
+}
+
+export interface MultiplayerPlayer {
+  id: string;
+  username: string;
+  avatar: string;
+  score: number;
+  isReady: boolean;
+  lastAnswerCorrect?: boolean;
+}
+
+export interface MultiplayerRoom {
+  id: string;
+  players: MultiplayerPlayer[];
+  status: 'waiting' | 'starting' | 'playing' | 'finished';
+  questions: Question[];
+  currentQuestionIndex: number;
+  timer: number;
+  category: Category;
 }

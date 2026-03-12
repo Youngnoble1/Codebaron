@@ -29,7 +29,7 @@ const shuffleArray = <T,>(array: T[]): T[] => {
 };
 
 // Cache management
-const CACHE_KEY_PREFIX = 'revgame_q_cache_';
+const CACHE_KEY_PREFIX = 'arkumen_q_cache_';
 
 const getCache = (key: string): Question[] => {
   try {
@@ -119,7 +119,7 @@ const fetchFreshQuestions = async (
     context = `Category: ${category || "General Knowledge"}. Focus on high-stakes Millionaire-style general trivia.`;
   }
 
-  const prompt = `Generate ${count} unique, high-quality trivia questions for a game called RevGame.
+  const prompt = `Generate ${count} unique, high-quality trivia questions for a game called Arkumen.
   Target Audience: High School students (JSS1 - SS3 context) for school subjects, or general adults for trivia.
   
   Context: ${context}

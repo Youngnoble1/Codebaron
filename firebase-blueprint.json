@@ -1,0 +1,44 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "Private user profile for Arkumen",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "username": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "royaltyPoints": { "type": "integer" },
+        "highestScore": { "type": "integer" },
+        "longestStreak": { "type": "integer" },
+        "avatar": { "type": "string" },
+        "playCount": { "type": "object" },
+        "favoriteCategory": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "username", "email", "royaltyPoints", "highestScore", "longestStreak", "avatar", "playCount", "favoriteCategory"]
+    },
+    "PublicProfile": {
+      "title": "PublicProfile",
+      "description": "Public user profile for leaderboard",
+      "type": "object",
+      "properties": {
+        "username": { "type": "string" },
+        "royaltyPoints": { "type": "integer" },
+        "highestScore": { "type": "integer" },
+        "avatar": { "type": "string" }
+      },
+      "required": ["username", "royaltyPoints", "highestScore", "avatar"]
+    }
+  },
+  "firestore": {
+    "users/{userId}": {
+      "schema": "User",
+      "description": "Private user profiles"
+    },
+    "leaderboard/{userId}": {
+      "schema": "PublicProfile",
+      "description": "Public profiles for leaderboard"
+    }
+  }
+}

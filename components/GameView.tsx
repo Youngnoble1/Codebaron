@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { GameMode, GameState, Question, User, Category } from '../types';
 import { fetchQuestions } from '../services/geminiService';
-import { ICONS, GOLD_COLOR } from '../constants';
+import { ICONS, GOLD_COLOR, REVELATIONS_QUESTIONS } from '../constants';
 
 interface GameViewProps {
   mode: GameMode;
@@ -36,6 +36,14 @@ const GameView: React.FC<GameViewProps> = ({ mode, category, user, onGameEnd, on
     setIsLoading(true);
     setError(null);
     try {
+      if (mode === GameMode.REVELATIONS) {
+        // Use static questions for Revelations Challenge
+        const shuffled = [...REVELATIONS_QUESTIONS].sort(() => Math.random() - 0.5);
+        setState(prev => ({ ...prev, questions: shuffled }));
+        setIsLoading(false);
+        return;
+      }
+
       let count = 36;
       if (mode === GameMode.TIMED) count = 20;
       if (mode === GameMode.SURVIVAL) count = 50; 
