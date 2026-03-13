@@ -19,7 +19,10 @@ import {
   LogOut,
   Camera,
   Upload,
-  Users
+  Users,
+  Settings as SettingsIcon,
+  Eye,
+  EyeOff
 } from 'lucide-react';
 import { Category, GameMode } from './types';
 
@@ -121,6 +124,7 @@ export const NAV_ITEMS = [
   { id: 'home', label: 'Home', icon: <Home className="w-6 h-6" /> },
   { id: 'leaderboard', label: 'Ranks', icon: <Trophy className="w-6 h-6" /> },
   { id: 'profile', label: 'Profile', icon: <UserIcon className="w-6 h-6" /> },
+  { id: 'settings', label: 'Settings', icon: <SettingsIcon className="w-6 h-6" /> },
 ];
 
 export const ICONS = {
@@ -136,7 +140,10 @@ export const ICONS = {
   LogOut,
   Camera,
   Upload,
-  Users
+  Users,
+  SettingsIcon,
+  Eye,
+  EyeOff
 };
 
 export const REVELATIONS_QUESTIONS = [

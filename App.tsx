@@ -6,6 +6,7 @@ import Auth from './components/Auth';
 import Navigation from './components/Navigation';
 import GameView from './components/GameView';
 import ProfileView from './components/ProfileView';
+import SettingsView from './components/SettingsView';
 import LeaderboardView from './components/LeaderboardView';
 import MultiplayerView from './components/MultiplayerView';
 import { auth, db, onAuthStateChanged, doc, getDoc, setDoc, updateDoc, Timestamp, handleFirestoreError, OperationType } from './firebase';
@@ -171,6 +172,8 @@ const App: React.FC = () => {
         return <LeaderboardView />;
       case 'profile':
         return <ProfileView user={user} onUpdateUser={handleUpdateUser} onLogout={handleLogout} />;
+      case 'settings':
+        return <SettingsView user={user} onUpdateUser={handleUpdateUser} />;
       default:
         return (
           <div className="p-6 pb-32 animate-in fade-in duration-500">

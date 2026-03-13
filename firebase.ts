@@ -12,7 +12,10 @@ import {
   sendPasswordResetEmail,
   setPersistence,
   browserLocalPersistence,
-  browserSessionPersistence
+  browserSessionPersistence,
+  updatePassword,
+  updateEmail,
+  updateProfile
 } from 'firebase/auth';
 import { getFirestore, doc, getDoc, setDoc, updateDoc, collection, query, orderBy, limit, onSnapshot, getDocFromServer, Timestamp } from 'firebase/firestore';
 import firebaseConfig from './firebase-applet-config.json';
@@ -106,6 +109,9 @@ export {
   orderBy, 
   limit, 
   onSnapshot, 
-  Timestamp 
+  Timestamp,
+  updatePassword,
+  updateEmail,
+  updateProfile
 };
 export type { FirebaseUser };
