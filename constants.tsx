@@ -411,5 +411,215 @@ export const REVELATIONS_QUESTIONS = [
     explanation: 'The fingers, hands, and legs stretch automatically as the spirit pandiculates.',
     difficulty: 1,
     category: 'Revelations' as any
+  },
+  {
+    id: 'rev-21',
+    text: 'According to the Prophet, what is the origin of titles like "Obi of Onitsha" or "Ooni of Ife"?',
+    options: [
+      'They were created by colonial masters.',
+      'They originate from titles of Patriarchs as the number 1 citizens of their tribes.',
+      'They were given by the gods of the forest.',
+      'They are based on the size of the kingdom.'
+    ],
+    correctAnswer: 1,
+    explanation: 'Titles like Obi or Ooni originate from titles of Patriarchs who are the number 1 citizens of their tribes.',
+    difficulty: 2,
+    category: 'Revelations' as any
+  },
+  {
+    id: 'rev-22',
+    text: 'What is the message of "eternal life" preached by Lucifer through witch doctors?',
+    options: [
+      'Resurrection of the body.',
+      'Reincarnation (dying and coming back repeatedly).',
+      'Living forever in a spirit world.',
+      'Becoming a star in the sky.'
+    ],
+    correctAnswer: 1,
+    explanation: 'Lucifer preaches reincarnation through witch doctors as a mimicry of the original truth.',
+    difficulty: 1,
+    category: 'Revelations' as any
+  },
+  {
+    id: 'rev-23',
+    text: 'In the context of the Mankind Race, what does the term "Chi gi" (Approver of Reincarnation) actually refer to according to the Prophet?',
+    options: [
+      'A personal guardian angel.',
+      'The Almighty God.',
+      'The Patriarch of the tribe you belong to.',
+      'Your biological grandfather.'
+    ],
+    correctAnswer: 2,
+    explanation: '"Chi gi" refers to your Patriarch, who is the determinant factor of the extent of your "flying colours."',
+    difficulty: 2,
+    category: 'Revelations' as any
+  },
+  {
+    id: 'rev-24',
+    text: 'How does the Prophet describe the Great Virgin Mary?',
+    options: [
+      'A lady who found favor by accident.',
+      'An envelope to be disposed of after use.',
+      'A Mediatrix and Kingdom Dignitary who existed in the plan of God.',
+      'The biological mother of God.'
+    ],
+    correctAnswer: 2,
+    explanation: 'She is a Mediatrix and a Kingdom Dignitary who existed in the plan of the God of Creation.',
+    difficulty: 1,
+    category: 'Revelations' as any
+  },
+  {
+    id: 'rev-25',
+    text: 'What does an "Elijah" provide in the context of the Spirit of Prophecy?',
+    options: [
+      'Only minor prophecies.',
+      'Prophecies in parts.',
+      'The complete version or whole of the Spirit of Prophecy.',
+      'Interpretations of dreams only.'
+    ],
+    correctAnswer: 2,
+    explanation: 'Elijah points to the completion of the Spirit of Prophecy, giving the complete version.',
+    difficulty: 2,
+    category: 'Revelations' as any
+  },
+  {
+    id: 'rev-26',
+    text: 'According to the Prophet\'s revelation on Revelations 21:14, what should be on the 12 pillars?',
+    options: [
+      'The names of the 12 Apostles of the Lamb.',
+      'The names of the 12 Patriarchs of the Mankind Race.',
+      'The names of the 12 tribes of Israel.',
+      'The names of the 12 gates of the city.'
+    ],
+    correctAnswer: 1,
+    explanation: 'The names of the 12 Patriarchs of the Mankind Race are on the 12 pillars.',
+    difficulty: 2,
+    category: 'Revelations' as any
+  },
+  {
+    id: 'rev-27',
+    text: 'What is the term used for the process that makes express immortalization possible, distinguishing it from standard heredity?',
+    options: [
+      'Genetic mutation.',
+      'Biological transfer.',
+      'Spiritual adoption.',
+      'Soul fusion.'
+    ],
+    correctAnswer: 1,
+    explanation: 'Express immortalization is made possible by "biological transfer," which is different from "heredity."',
+    difficulty: 2,
+    category: 'Revelations' as any
+  },
+  {
+    id: 'rev-28',
+    text: 'What was the Prophet\'s interpretation of God asking the Israelites to "borrow" from the Egyptians in Exodus?',
+    options: [
+      'It was a national scam.',
+      'They were collecting what was owed to them from years of business dealings.',
+      'They were stealing as a form of punishment.',
+      'It was a test of their faith.'
+    ],
+    correctAnswer: 1,
+    explanation: 'God asked them to collect what was owed to them from their business dealings with the Egyptians.',
+    difficulty: 2,
+    category: 'Revelations' as any
+  },
+  {
+    id: 'rev-29',
+    text: 'How does the Prophet describe the physical body we currently wear?',
+    options: [
+      'Our permanent home.',
+      'A gift from the ancestors.',
+      'A "borrowed nature" (Egyptian) while the spirit being is an Israelite.',
+      'A shell that has no value.'
+    ],
+    correctAnswer: 2,
+    explanation: 'The spirit being is an Israelite, but the physical body is an Egyptian "borrowed nature."',
+    difficulty: 2,
+    category: 'Revelations' as any
+  },
+  {
+    id: 'rev-30',
+    text: 'What is the first step recommended for someone who finds an inherited shrine in their paternal home?',
+    options: [
+      'Destroy it immediately with fire.',
+      'Run into the true Church for Divine Programming of Spiritual Protection.',
+      'Perform a traditional sacrifice to appease it.',
+      'Ignore it and hope it goes away.'
+    ],
+    correctAnswer: 1,
+    explanation: 'The first step is to run into the true Church for Divine Programming of Spiritual Protection.',
+    difficulty: 1,
+    category: 'Revelations' as any
+  },
+  {
+    id: 'rev-31',
+    text: 'According to the Prophet, what are God the Father, God the Son, and God the Most Holy Spirit?',
+    options: [
+      'Three different people working together.',
+      'Three different modes of operation of the God of Creation.',
+      'Three separate gods in a hierarchy.',
+      'One person with three different names.'
+    ],
+    correctAnswer: 1,
+    explanation: 'They are three different modes of operation of the God of Creation.',
+    difficulty: 1,
+    category: 'Revelations' as any
+  },
+  {
+    id: 'rev-32',
+    text: 'Which of these is NOT listed by the Prophet as a tradition whose origin should be questioned?',
+    options: [
+      'Sending people on exile.',
+      'Ostracizing one as an Osu.',
+      'Killing of twins.',
+      'Planting trees for shade.'
+    ],
+    correctAnswer: 3,
+    explanation: 'Planting trees for shade is not listed as one of the questionable traditions like killing twins or ostracizing people.',
+    difficulty: 1,
+    category: 'Revelations' as any
+  },
+  {
+    id: 'rev-33',
+    text: 'What does the Prophet say about a god that worshippers must feed?',
+    options: [
+      'It is a very hungry god.',
+      'It is a god that requires sacrifice.',
+      'It is not a god.',
+      'It is a god of the ancestors.'
+    ],
+    correctAnswer: 2,
+    explanation: '"The god that the people worshipping him feeds is not a god."',
+    difficulty: 1,
+    category: 'Revelations' as any
+  },
+  {
+    id: 'rev-34',
+    text: 'What happens when an airspace is "dormant" for a long time (e.g., 1000 years)?',
+    options: [
+      'It becomes pure and holy.',
+      'It becomes a good atmosphere for familiar spirits and demons.',
+      'It loses all oxygen.',
+      'It turns into a vacuum.'
+    ],
+    correctAnswer: 1,
+    explanation: 'A dormant airspace becomes a good atmosphere for familiar spirits and demons.',
+    difficulty: 2,
+    category: 'Revelations' as any
+  },
+  {
+    id: 'rev-35',
+    text: 'Why might a person expressly immortalize while their "superbio father" did not?',
+    options: [
+      'They were luckier.',
+      'They were assigned to a different Angel of the Church.',
+      'God saw that the father might not have listened to the Prophet due to personality differences.',
+      'The father was not a child of the Kingdom.'
+    ],
+    correctAnswer: 2,
+    explanation: 'God makes decisions based on seeing the end from the beginning, including whether one would listen to the Prophet.',
+    difficulty: 2,
+    category: 'Revelations' as any
   }
 ];
