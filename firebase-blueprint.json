@@ -31,20 +31,6 @@
         "avatar": { "type": "string" }
       },
       "required": ["id", "username"]
-    },
-    "ChatMessage": {
-      "title": "ChatMessage",
-      "description": "A message in the global chat",
-      "type": "object",
-      "properties": {
-        "id": { "type": "string" },
-        "userId": { "type": "string" },
-        "username": { "type": "string" },
-        "avatar": { "type": "string" },
-        "text": { "type": "string" },
-        "createdAt": { "type": "string", "format": "date-time" }
-      },
-      "required": ["id", "userId", "username", "text", "createdAt"]
     }
   },
   "firestore": {
@@ -55,10 +41,6 @@
     "/leaderboard/{userId}": {
       "schema": "LeaderboardEntry",
       "description": "Leaderboard documents"
-    },
-    "/chat/{messageId}": {
-      "schema": "ChatMessage",
-      "description": "Global chat messages"
     }
   }
 }

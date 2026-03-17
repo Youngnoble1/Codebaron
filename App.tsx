@@ -14,7 +14,6 @@ import SettingsView from './components/SettingsView';
 import LeaderboardView from './components/LeaderboardView';
 import MultiplayerView from './components/MultiplayerView';
 import ErrorBoundary from './components/ErrorBoundary';
-import ChatView from './components/ChatView';
 
 const GUEST_ID_KEY = 'arkumen_guest_id';
 
@@ -93,6 +92,8 @@ const App: React.FC = () => {
       isInitializing = true;
 
       try {
+        console.log("Initializing warrior session...");
+        
         // Test connection
         try {
           await getDocFromServer(doc(db, 'test', 'connection'));
@@ -106,8 +107,18 @@ const App: React.FC = () => {
         let userId = firebaseUser?.uid;
         
         if (!userId) {
-          const userCredential = await signInAnonymously(auth);
-          userId = userCredential.user.uid;
+          console.log("No active session found. Signing in anonymously...");
+          try {
+            const userCredential = await signInAnonymously(auth);
+            userId = userCredential.user.uid;
+            console.log("Anonymous sign-in successful:", userId);
+          } catch (authError: any) {
+            console.error("Authentication failed:", authError);
+            if (authError.code === 'auth/operation-not-allowed') {
+              console.error("Anonymous authentication is not enabled in the Firebase Console.");
+            }
+            throw authError;
+          }
         }
 
         const userDocRef = doc(db, 'users', userId);
@@ -115,12 +126,15 @@ const App: React.FC = () => {
         try {
           userDocSnap = await getDoc(userDocRef);
         } catch (error) {
+          console.error("Failed to fetch user document:", error);
           handleFirestoreError(error, OperationType.GET, `users/${userId}`);
         }
 
         if (userDocSnap && userDocSnap.exists()) {
+          console.log("Existing warrior profile found.");
           setUser(userDocSnap.data() as User);
         } else {
+          console.log("Creating new warrior profile...");
           // Create new guest profile
           const newUser: User = {
             id: userId,
@@ -138,7 +152,9 @@ const App: React.FC = () => {
 
           try {
             await setDoc(userDocRef, newUser);
+            console.log("Warrior profile created successfully.");
           } catch (error) {
+            console.error("Failed to create user document:", error);
             handleFirestoreError(error, OperationType.WRITE, `users/${userId}`);
           }
 
@@ -151,14 +167,20 @@ const App: React.FC = () => {
               highestScore: newUser.highestScore,
               avatar: newUser.avatar
             });
+            console.log("Leaderboard entry initialized.");
           } catch (error) {
+            console.error("Failed to initialize leaderboard entry:", error);
             handleFirestoreError(error, OperationType.WRITE, `leaderboard/${userId}`);
           }
           
           setUser(newUser);
         }
-      } catch (error) {
-        console.error("Error initializing guest user", error);
+      } catch (error: any) {
+        console.error("CRITICAL: Error initializing guest user", error);
+        // If it's a quota error, we should inform the user
+        if (error.message?.includes('Quota exceeded')) {
+          console.error("Firestore quota exceeded. Please check your Firebase billing plan.");
+        }
       } finally {
         setLoading(false);
         isInitializing = false;
@@ -264,8 +286,23 @@ const App: React.FC = () => {
 
   if (!user) {
     return (
-      <div className="min-h-screen bg-[#050b18] flex items-center justify-center">
-        <p className="text-red-500">Failed to initialize guest session.</p>
+      <div className="min-h-screen bg-[#050b18] flex flex-col items-center justify-center p-6 text-center">
+        <div className="w-16 h-16 bg-red-500/10 rounded-full flex items-center justify-center mb-6">
+          <ICONS.EyeOff className="text-red-500 w-8 h-8" />
+        </div>
+        <h1 className="text-2xl font-cinzel text-white mb-2">ARENA CONNECTION FAILED</h1>
+        <p className="text-gray-400 text-sm mb-8 max-w-xs">
+          We couldn't initialize your warrior profile. This might be due to a connection issue, unauthorized domain, or server maintenance.
+        </p>
+        <button 
+          onClick={() => window.location.reload()}
+          className="px-8 py-3 gold-gradient text-slate-900 font-bold rounded-xl shadow-xl hover:scale-105 transition-all transform active:scale-95"
+        >
+          RETRY CONNECTION
+        </button>
+        <p className="mt-6 text-[10px] text-gray-600 uppercase tracking-widest">
+          Check browser console for detailed error logs
+        </p>
       </div>
     );
   }
@@ -301,8 +338,6 @@ const App: React.FC = () => {
     switch (activeTab) {
       case 'leaderboard':
         return <LeaderboardView />;
-      case 'chat':
-        return <ChatView user={user} />;
       case 'profile':
         return <ProfileView user={user} onUpdateUser={handleUpdateUser} />;
       case 'settings':
