@@ -6,10 +6,9 @@ import { ICONS, CATEGORIES } from '../constants';
 interface ProfileViewProps {
   user: User;
   onUpdateUser: (updates: Partial<User>) => void;
-  onLogout: () => void;
 }
 
-const ProfileView: React.FC<ProfileViewProps> = ({ user, onUpdateUser, onLogout }) => {
+const ProfileView: React.FC<ProfileViewProps> = ({ user, onUpdateUser }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [editedUsername, setEditedUsername] = useState(user.username);
   const [editedAvatar, setEditedAvatar] = useState(user.avatar);
@@ -43,13 +42,6 @@ const ProfileView: React.FC<ProfileViewProps> = ({ user, onUpdateUser, onLogout 
     <div className="min-h-screen bg-[#050b18] text-white p-6 pb-32">
       <div className="flex justify-between items-center mb-8">
         <h1 className="text-3xl font-cinzel gold-text-gradient font-bold">MY PROFILE</h1>
-        <button 
-          onClick={onLogout}
-          className="p-2 text-red-400 hover:bg-red-500/10 rounded-full transition-colors flex items-center gap-2 text-xs font-bold uppercase"
-        >
-          <ICONS.LogOut className="w-4 h-4" />
-          Exit App
-        </button>
       </div>
 
       <div className="glass-card rounded-2xl p-8 border border-yellow-500/20 mb-8 relative overflow-hidden">

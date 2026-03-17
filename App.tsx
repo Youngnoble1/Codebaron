@@ -2,14 +2,16 @@
 import React, { useState, useEffect } from 'react';
 import { User, GameMode, Category } from './types';
 import { GAME_MODES, TRIVIA_CATEGORIES, ACADEMIC_SUBJECTS } from './constants';
-import Auth from './components/Auth';
+// import Auth from './components/Auth';
 import Navigation from './components/Navigation';
 import GameView from './components/GameView';
 import ProfileView from './components/ProfileView';
 import SettingsView from './components/SettingsView';
 import LeaderboardView from './components/LeaderboardView';
 import MultiplayerView from './components/MultiplayerView';
-import { auth, db, onAuthStateChanged, doc, getDoc, setDoc, updateDoc, Timestamp, handleFirestoreError, OperationType } from './firebase';
+import { db, doc, getDoc, setDoc, updateDoc, Timestamp, handleFirestoreError, OperationType } from './firebase';
+
+const GUEST_ID_KEY = 'arkumen_guest_id';
 
 const App: React.FC = () => {
   const [user, setUser] = useState<User | null>(null);
@@ -22,43 +24,70 @@ const App: React.FC = () => {
   const [showSpecialistMenu, setShowSpecialistMenu] = useState(false);
   const [showRevelationsMenu, setShowRevelationsMenu] = useState(false);
 
-  // Initialize Firebase Auth
+  // Initialize Guest User
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      if (firebaseUser) {
-        try {
-          const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
-          if (userDoc.exists()) {
-            setUser(userDoc.data() as User);
-          } else {
-            // This case should be handled in Auth.tsx after first login
-            setUser(null);
-          }
-        } catch (error) {
-          handleFirestoreError(error, OperationType.GET, `users/${firebaseUser.uid}`);
-        }
-      } else {
-        setUser(null);
+    const initUser = async () => {
+      let guestId = localStorage.getItem(GUEST_ID_KEY);
+      
+      if (!guestId) {
+        guestId = 'guest_' + Math.random().toString(36).substr(2, 9);
+        localStorage.setItem(GUEST_ID_KEY, guestId);
       }
-      setLoading(false);
-    });
 
-    return () => unsubscribe();
+      try {
+        const userDoc = await getDoc(doc(db, 'users', guestId));
+        if (userDoc.exists()) {
+          setUser(userDoc.data() as User);
+        } else {
+          // Create new guest profile
+          const newUser: User = {
+            id: guestId,
+            username: `Guest_${guestId.substr(-4)}`,
+            email: '',
+            royaltyPoints: 0,
+            highestScore: 0,
+            longestStreak: 0,
+            favoriteCategory: 'General Knowledge',
+            avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${guestId}`,
+            playCount: {},
+            role: 'player',
+            createdAt: Timestamp.now()
+          };
+          await setDoc(doc(db, 'users', guestId), newUser);
+          
+          // Initialize leaderboard entry too
+          await setDoc(doc(db, 'leaderboard', guestId), {
+            username: newUser.username,
+            royaltyPoints: newUser.royaltyPoints,
+            highestScore: newUser.highestScore,
+            avatar: newUser.avatar
+          });
+          
+          setUser(newUser);
+        }
+      } catch (error) {
+        console.error("Error initializing guest user", error);
+        // Fallback to local only if firestore fails
+        setUser({
+          id: guestId,
+          username: 'Guest',
+          email: '',
+          royaltyPoints: 0,
+          highestScore: 0,
+          longestStreak: 0,
+          favoriteCategory: 'General Knowledge',
+          avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${guestId}`,
+          playCount: {},
+          role: 'player',
+          createdAt: new Date()
+        } as User);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    initUser();
   }, []);
-
-  const handleLogin = (newUser: User) => {
-    setUser(newUser);
-  };
-
-  const handleLogout = async () => {
-    try {
-      await auth.signOut();
-      setUser(null);
-      setActiveTab('home');
-    } catch (error) {
-      console.error("Logout error", error);
-    }
-  };
 
   const handleUpdateUser = async (updates: Partial<User>) => {
     if (!user) return;
@@ -136,7 +165,11 @@ const App: React.FC = () => {
   }
 
   if (!user) {
-    return <Auth onLogin={handleLogin} />;
+    return (
+      <div className="min-h-screen bg-[#050b18] flex items-center justify-center">
+        <p className="text-red-500">Failed to initialize guest session.</p>
+      </div>
+    );
   }
 
   if (currentGame) {
@@ -171,7 +204,7 @@ const App: React.FC = () => {
       case 'leaderboard':
         return <LeaderboardView />;
       case 'profile':
-        return <ProfileView user={user} onUpdateUser={handleUpdateUser} onLogout={handleLogout} />;
+        return <ProfileView user={user} onUpdateUser={handleUpdateUser} />;
       case 'settings':
         return <SettingsView user={user} onUpdateUser={handleUpdateUser} />;
       default:

@@ -1,30 +1,11 @@
 
 import { initializeApp } from 'firebase/app';
-import { 
-  getAuth, 
-  GoogleAuthProvider, 
-  signInWithPopup, 
-  signOut, 
-  onAuthStateChanged, 
-  User as FirebaseUser,
-  createUserWithEmailAndPassword,
-  signInWithEmailAndPassword,
-  sendPasswordResetEmail,
-  setPersistence,
-  browserLocalPersistence,
-  browserSessionPersistence,
-  updatePassword,
-  updateEmail,
-  updateProfile
-} from 'firebase/auth';
 import { getFirestore, doc, getDoc, setDoc, updateDoc, collection, query, orderBy, limit, onSnapshot, getDocFromServer, Timestamp } from 'firebase/firestore';
 import firebaseConfig from './firebase-applet-config.json';
 
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
-export const auth = getAuth(app);
 export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
-export const googleProvider = new GoogleAuthProvider();
 
 // Operation types for error handling
 export enum OperationType {
@@ -59,17 +40,12 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
   const errInfo: FirestoreErrorInfo = {
     error: error instanceof Error ? error.message : String(error),
     authInfo: {
-      userId: auth.currentUser?.uid,
-      email: auth.currentUser?.email,
-      emailVerified: auth.currentUser?.emailVerified,
-      isAnonymous: auth.currentUser?.isAnonymous,
-      tenantId: auth.currentUser?.tenantId,
-      providerInfo: auth.currentUser?.providerData.map(provider => ({
-        providerId: provider.providerId,
-        displayName: provider.displayName,
-        email: provider.email,
-        photoUrl: provider.photoURL
-      })) || []
+      userId: 'guest',
+      email: 'guest@example.com',
+      emailVerified: false,
+      isAnonymous: true,
+      tenantId: null,
+      providerInfo: []
     },
     operationType,
     path
@@ -91,15 +67,6 @@ async function testConnection() {
 testConnection();
 
 export { 
-  signInWithPopup, 
-  signOut, 
-  onAuthStateChanged, 
-  createUserWithEmailAndPassword,
-  signInWithEmailAndPassword,
-  sendPasswordResetEmail,
-  setPersistence,
-  browserLocalPersistence,
-  browserSessionPersistence,
   doc, 
   getDoc, 
   setDoc, 
@@ -109,9 +76,5 @@ export {
   orderBy, 
   limit, 
   onSnapshot, 
-  Timestamp,
-  updatePassword,
-  updateEmail,
-  updateProfile
+  Timestamp
 };
-export type { FirebaseUser };
