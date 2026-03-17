@@ -2,43 +2,63 @@
   "entities": {
     "User": {
       "title": "User",
-      "description": "Private user profile for Arkumen",
+      "description": "User profile and stats",
       "type": "object",
       "properties": {
         "id": { "type": "string" },
         "username": { "type": "string" },
-        "email": { "type": "string", "format": "email" },
+        "email": { "type": "string" },
         "royaltyPoints": { "type": "integer" },
         "highestScore": { "type": "integer" },
         "longestStreak": { "type": "integer" },
+        "favoriteCategory": { "type": "string" },
         "avatar": { "type": "string" },
         "playCount": { "type": "object" },
-        "favoriteCategory": { "type": "string" },
+        "role": { "type": "string" },
         "createdAt": { "type": "string", "format": "date-time" }
       },
-      "required": ["id", "username", "email", "royaltyPoints", "highestScore", "longestStreak", "avatar", "playCount", "favoriteCategory"]
+      "required": ["id", "username"]
     },
-    "PublicProfile": {
-      "title": "PublicProfile",
-      "description": "Public user profile for leaderboard",
+    "LeaderboardEntry": {
+      "title": "LeaderboardEntry",
+      "description": "Public leaderboard entry",
       "type": "object",
       "properties": {
+        "id": { "type": "string" },
         "username": { "type": "string" },
         "royaltyPoints": { "type": "integer" },
         "highestScore": { "type": "integer" },
         "avatar": { "type": "string" }
       },
-      "required": ["username", "royaltyPoints", "highestScore", "avatar"]
+      "required": ["id", "username"]
+    },
+    "ChatMessage": {
+      "title": "ChatMessage",
+      "description": "A message in the global chat",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "username": { "type": "string" },
+        "avatar": { "type": "string" },
+        "text": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "userId", "username", "text", "createdAt"]
     }
   },
   "firestore": {
-    "users/{userId}": {
+    "/users/{userId}": {
       "schema": "User",
-      "description": "Private user profiles"
+      "description": "User documents"
     },
-    "leaderboard/{userId}": {
-      "schema": "PublicProfile",
-      "description": "Public profiles for leaderboard"
+    "/leaderboard/{userId}": {
+      "schema": "LeaderboardEntry",
+      "description": "Leaderboard documents"
+    },
+    "/chat/{messageId}": {
+      "schema": "ChatMessage",
+      "description": "Global chat messages"
     }
   }
 }

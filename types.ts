@@ -23,7 +23,6 @@ export type Category =
   | 'Global Current Affairs'
   | 'Nigerian Current Affairs'
   | 'General Knowledge'
-  | 'Pop Culture'
   | 'Science & Nature'
   | 'History'
   | 'Geography (General)'
@@ -93,4 +92,13 @@ export interface MultiplayerRoom {
   currentQuestionIndex: number;
   timer: number;
   category: Category;
+}
+
+export interface ChatMessage {
+  id: string;
+  userId: string;
+  username: string;
+  avatar: string;
+  text: string;
+  createdAt: string;
 }

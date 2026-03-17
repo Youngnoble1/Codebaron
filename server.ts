@@ -113,6 +113,11 @@ async function startServer() {
               category: 'General Knowledge'
             };
             rooms.set(roomId, room);
+            
+            // Pre-fetch questions in background
+            fetchServerQuestions(10, room.category).then(qs => {
+              if (room) room.questions = qs;
+            }).catch(e => console.error("Pre-fetch error:", e));
           }
 
           if (room.status !== 'waiting') {
@@ -151,8 +156,11 @@ async function startServer() {
             broadcastToRoom(currentRoomId, { type: "room_update", room });
             
             try {
-              const questions = await fetchServerQuestions(10, room.category);
-              room.questions = questions;
+              // Use pre-fetched questions if available, otherwise fetch
+              if (room.questions.length === 0) {
+                room.questions = await fetchServerQuestions(10, room.category);
+              }
+              
               room.status = 'playing';
               room.currentQuestionIndex = 0;
               room.timer = 15;

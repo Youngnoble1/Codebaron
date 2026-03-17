@@ -92,6 +92,20 @@ export const fetchQuestions = async (
   return shuffleArray(unique).slice(0, count).map(randomizeOptions);
 };
 
+export const prewarmCache = async (categories: string[]) => {
+  // Fetch 10 questions for each category in background
+  for (const cat of categories) {
+    fetchFreshQuestions(10, cat as Category)
+      .then(fresh => {
+        const cached = getCache(cat);
+        const updated = [...cached, ...fresh];
+        const unique = Array.from(new Map(updated.map(q => [q.text, q])).values());
+        setCache(cat, unique);
+      })
+      .catch(() => {});
+  }
+};
+
 const fetchFreshQuestions = async (
   count: number,
   category?: Category,

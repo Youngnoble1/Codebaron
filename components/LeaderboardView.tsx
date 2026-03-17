@@ -1,8 +1,9 @@
 
 import React, { useState, useEffect } from 'react';
+import { db } from '../firebase';
+import { collection, query, orderBy, limit, onSnapshot } from 'firebase/firestore';
 import { LeaderboardEntry } from '../types';
 import { ICONS } from '../constants';
-import { db, collection, query, orderBy, limit, onSnapshot, handleFirestoreError, OperationType } from '../firebase';
 
 const LeaderboardView: React.FC = () => {
   const [leaders, setLeaders] = useState<LeaderboardEntry[]>([]);
@@ -10,19 +11,18 @@ const LeaderboardView: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const q = query(collection(db, 'leaderboard'), orderBy('royaltyPoints', 'desc'), limit(10));
-    
+    const q = query(
+      collection(db, 'leaderboard'),
+      orderBy('royaltyPoints', 'desc'),
+      limit(10)
+    );
+
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      const sortedLeaders: LeaderboardEntry[] = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      } as LeaderboardEntry));
-      
-      setLeaders(sortedLeaders);
+      const leaderboardData = snapshot.docs.map(doc => doc.data() as LeaderboardEntry);
+      setLeaders(leaderboardData);
       setLoading(false);
     }, (err) => {
-      console.error("Leaderboard snapshot error", err);
-      handleFirestoreError(err, OperationType.LIST, 'leaderboard');
+      console.error("Leaderboard fetch error", err);
       setError("Failed to load rankings. Please try again.");
       setLoading(false);
     });

@@ -2,13 +2,14 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { GameMode, GameState, Question, User, Category } from '../types';
 import { fetchQuestions } from '../services/geminiService';
+import { audioService } from '../services/audioService';
 import { ICONS, GOLD_COLOR, REVELATIONS_QUESTIONS } from '../constants';
 
 interface GameViewProps {
   mode: GameMode;
   category?: Category;
   user: User;
-  onGameEnd: (stats: { score: number; streak: number; won: boolean }) => void;
+  onGameEnd: (stats: { score: number; streak: number; won: boolean; grade: string; message: string }) => void;
   onExit: (stats?: { score: number; streak: number }) => void;
 }
 
@@ -82,13 +83,53 @@ const GameView: React.FC<GameViewProps> = ({ mode, category, user, onGameEnd, on
   }, [state.timeLeft, state.isGameOver, mode]);
 
   const endGame = () => {
-    const isPerfect = state.correctCount === state.questions.length && state.questions.length > 0;
-    setState(prev => ({ ...prev, isGameOver: true, isWon: isPerfect }));
+    const totalQuestions = state.questions.length;
+    const correctCount = state.correctCount;
+    const percentage = (correctCount / totalQuestions) * 100;
     
+    let grade = '';
+    let message = '';
+    let soundType: 'trophy' | 'fail' | 'none' = 'none';
+    let showConfetti = false;
+
+    if (percentage >= 90) {
+      grade = 'EXCELLENT';
+      message = 'Outstanding! You are a true master of this arena.';
+      soundType = 'trophy';
+      showConfetti = true;
+    } else if (percentage >= 70) {
+      grade = 'VERY GOOD';
+      message = 'Impressive work! Your knowledge is vast.';
+      soundType = 'trophy';
+      showConfetti = true;
+    } else if (percentage >= 50) {
+      grade = 'GOOD';
+      message = 'Good, but need more practice.';
+      soundType = 'none';
+      showConfetti = false;
+    } else if (percentage >= 30) {
+      grade = 'FAIR';
+      message = 'Do better next time.';
+      soundType = 'fail';
+      showConfetti = false;
+    } else {
+      grade = 'FAIL';
+      message = 'Do better next time.';
+      soundType = 'fail';
+      showConfetti = false;
+    }
+
+    setState(prev => ({ ...prev, isGameOver: true }));
+    
+    if (soundType === 'trophy') audioService.playTrophy();
+    if (soundType === 'fail') audioService.playFail();
+
     onGameEnd({ 
       score: state.score, 
       streak: state.maxStreak, 
-      won: isPerfect
+      won: showConfetti,
+      grade,
+      message
     });
   };
 
@@ -99,8 +140,11 @@ const GameView: React.FC<GameViewProps> = ({ mode, category, user, onGameEnd, on
     const isCorrect = index === currentQ.correctAnswer;
 
     if (isCorrect) {
+      audioService.playCorrect();
       setIsScorePulsing(true);
       setTimeout(() => setIsScorePulsing(false), 600);
+    } else {
+      audioService.playWrong();
     }
 
     setState(prev => {

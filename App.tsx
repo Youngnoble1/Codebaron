@@ -1,7 +1,11 @@
 
 import React, { useState, useEffect } from 'react';
+import { db, auth } from './firebase';
+import { doc, getDoc, setDoc, updateDoc, getDocFromServer } from 'firebase/firestore';
+import { signInAnonymously, onAuthStateChanged } from 'firebase/auth';
 import { User, GameMode, Category } from './types';
-import { GAME_MODES, TRIVIA_CATEGORIES, ACADEMIC_SUBJECTS } from './constants';
+import { GAME_MODES, TRIVIA_CATEGORIES, ACADEMIC_SUBJECTS, ICONS } from './constants';
+import { prewarmCache } from './services/geminiService';
 // import Auth from './components/Auth';
 import Navigation from './components/Navigation';
 import GameView from './components/GameView';
@@ -9,9 +13,61 @@ import ProfileView from './components/ProfileView';
 import SettingsView from './components/SettingsView';
 import LeaderboardView from './components/LeaderboardView';
 import MultiplayerView from './components/MultiplayerView';
-import { db, doc, getDoc, setDoc, updateDoc, Timestamp, handleFirestoreError, OperationType } from './firebase';
+import ErrorBoundary from './components/ErrorBoundary';
+import ChatView from './components/ChatView';
 
 const GUEST_ID_KEY = 'arkumen_guest_id';
+
+enum OperationType {
+  CREATE = 'create',
+  UPDATE = 'update',
+  DELETE = 'delete',
+  LIST = 'list',
+  GET = 'get',
+  WRITE = 'write',
+}
+
+interface FirestoreErrorInfo {
+  error: string;
+  operationType: OperationType;
+  path: string | null;
+  authInfo: {
+    userId: string | undefined;
+    email: string | null | undefined;
+    emailVerified: boolean | undefined;
+    isAnonymous: boolean | undefined;
+    tenantId: string | null | undefined;
+    providerInfo: {
+      providerId: string;
+      displayName: string | null;
+      email: string | null;
+      photoUrl: string | null;
+    }[];
+  }
+}
+
+const handleFirestoreError = (error: unknown, operationType: OperationType, path: string | null) => {
+  const errInfo: FirestoreErrorInfo = {
+    error: error instanceof Error ? error.message : String(error),
+    authInfo: {
+      userId: auth.currentUser?.uid,
+      email: auth.currentUser?.email,
+      emailVerified: auth.currentUser?.emailVerified,
+      isAnonymous: auth.currentUser?.isAnonymous,
+      tenantId: auth.currentUser?.tenantId,
+      providerInfo: auth.currentUser?.providerData.map(provider => ({
+        providerId: provider.providerId,
+        displayName: provider.displayName,
+        email: provider.email,
+        photoUrl: provider.photoURL
+      })) || []
+    },
+    operationType,
+    path
+  };
+  console.error('Firestore Error: ', JSON.stringify(errInfo));
+  throw new Error(JSON.stringify(errInfo));
+};
 
 const App: React.FC = () => {
   const [user, setUser] = useState<User | null>(null);
@@ -23,70 +79,97 @@ const App: React.FC = () => {
   const [showSSCEMenu, setShowSSCEMenu] = useState(false);
   const [showSpecialistMenu, setShowSpecialistMenu] = useState(false);
   const [showRevelationsMenu, setShowRevelationsMenu] = useState(false);
+  const [summaryStats, setSummaryStats] = useState<{ score: number; streak: number; won: boolean; grade: string; message: string } | null>(null);
 
   // Initialize Guest User
   useEffect(() => {
-    const initUser = async () => {
-      let guestId = localStorage.getItem(GUEST_ID_KEY);
-      
-      if (!guestId) {
-        guestId = 'guest_' + Math.random().toString(36).substr(2, 9);
-        localStorage.setItem(GUEST_ID_KEY, guestId);
-      }
+    // Pre-warm cache for common categories immediately
+    prewarmCache(['General Knowledge', 'Science & Nature']);
+
+    let isInitializing = false;
+
+    const initUser = async (firebaseUser: any) => {
+      if (isInitializing) return;
+      isInitializing = true;
 
       try {
-        const userDoc = await getDoc(doc(db, 'users', guestId));
-        if (userDoc.exists()) {
-          setUser(userDoc.data() as User);
+        // Test connection
+        try {
+          await getDocFromServer(doc(db, 'test', 'connection'));
+        } catch (e) {
+          // Ignore connection test errors unless they are "offline"
+          if (e instanceof Error && e.message.includes('the client is offline')) {
+            console.error("Firebase connection error: the client is offline");
+          }
+        }
+
+        let userId = firebaseUser?.uid;
+        
+        if (!userId) {
+          const userCredential = await signInAnonymously(auth);
+          userId = userCredential.user.uid;
+        }
+
+        const userDocRef = doc(db, 'users', userId);
+        let userDocSnap;
+        try {
+          userDocSnap = await getDoc(userDocRef);
+        } catch (error) {
+          handleFirestoreError(error, OperationType.GET, `users/${userId}`);
+        }
+
+        if (userDocSnap && userDocSnap.exists()) {
+          setUser(userDocSnap.data() as User);
         } else {
           // Create new guest profile
           const newUser: User = {
-            id: guestId,
-            username: `Guest_${guestId.substr(-4)}`,
+            id: userId,
+            username: `Guest_${userId.substr(-4)}`,
             email: '',
             royaltyPoints: 0,
             highestScore: 0,
             longestStreak: 0,
             favoriteCategory: 'General Knowledge',
-            avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${guestId}`,
+            avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${userId}`,
             playCount: {},
             role: 'player',
-            createdAt: Timestamp.now()
+            createdAt: new Date().toISOString()
           };
-          await setDoc(doc(db, 'users', guestId), newUser);
-          
+
+          try {
+            await setDoc(userDocRef, newUser);
+          } catch (error) {
+            handleFirestoreError(error, OperationType.WRITE, `users/${userId}`);
+          }
+
           // Initialize leaderboard entry too
-          await setDoc(doc(db, 'leaderboard', guestId), {
-            username: newUser.username,
-            royaltyPoints: newUser.royaltyPoints,
-            highestScore: newUser.highestScore,
-            avatar: newUser.avatar
-          });
+          try {
+            await setDoc(doc(db, 'leaderboard', userId), {
+              id: userId,
+              username: newUser.username,
+              royaltyPoints: newUser.royaltyPoints,
+              highestScore: newUser.highestScore,
+              avatar: newUser.avatar
+            });
+          } catch (error) {
+            handleFirestoreError(error, OperationType.WRITE, `leaderboard/${userId}`);
+          }
           
           setUser(newUser);
         }
       } catch (error) {
         console.error("Error initializing guest user", error);
-        // Fallback to local only if firestore fails
-        setUser({
-          id: guestId,
-          username: 'Guest',
-          email: '',
-          royaltyPoints: 0,
-          highestScore: 0,
-          longestStreak: 0,
-          favoriteCategory: 'General Knowledge',
-          avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${guestId}`,
-          playCount: {},
-          role: 'player',
-          createdAt: new Date()
-        } as User);
       } finally {
         setLoading(false);
+        isInitializing = false;
       }
     };
 
-    initUser();
+    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+      initUser(firebaseUser);
+    });
+
+    return () => unsubscribe();
   }, []);
 
   const handleUpdateUser = async (updates: Partial<User>) => {
@@ -96,8 +179,14 @@ const App: React.FC = () => {
     setUser(updatedUser);
     
     try {
-      const userRef = doc(db, 'users', user.id);
-      await updateDoc(userRef, updates);
+      const userDocRef = doc(db, 'users', user.id);
+      try {
+        await updateDoc(userDocRef, updates);
+        console.log('User profile updated successfully');
+      } catch (error) {
+        console.error('Failed to update user profile:', error);
+        handleFirestoreError(error, OperationType.UPDATE, `users/${user.id}`);
+      }
       
       // Also update leaderboard if relevant fields changed
       const leaderboardFields = ['username', 'royaltyPoints', 'highestScore', 'avatar'];
@@ -108,14 +197,21 @@ const App: React.FC = () => {
         changedLeaderboardFields.forEach(field => {
           leaderboardUpdates[field] = (updates as any)[field];
         });
-        await setDoc(doc(db, 'leaderboard', user.id), leaderboardUpdates, { merge: true });
+
+        try {
+          await setDoc(doc(db, 'leaderboard', user.id), leaderboardUpdates, { merge: true });
+          console.log('Leaderboard updated successfully');
+        } catch (error) {
+          console.error('Failed to update leaderboard:', error);
+          handleFirestoreError(error, OperationType.UPDATE, `leaderboard/${user.id}`);
+        }
       }
     } catch (error) {
-      handleFirestoreError(error, OperationType.UPDATE, `users/${user.id}`);
+      console.error('Error in handleUpdateUser:', error);
     }
   };
 
-  const handleGameEnd = (stats: { score: number; streak: number; won: boolean }) => {
+  const handleGameEnd = (stats: { score: number; streak: number; won: boolean; grade: string; message: string }) => {
     if (!user || !currentGame) return;
 
     const currentCat = currentGame.category || 'General Knowledge';
@@ -132,6 +228,8 @@ const App: React.FC = () => {
       playCount: newPlayCount,
       favoriteCategory: favCat
     });
+
+    setSummaryStats(stats);
 
     if (stats.won) {
       const win = window as any;
@@ -190,7 +288,7 @@ const App: React.FC = () => {
         onExit={(stats) => {
           // If the player exits early, still save their current score and streak
           if (stats && stats.score > 0) {
-            handleGameEnd({ ...stats, won: false });
+            handleGameEnd({ ...stats, won: false, grade: 'ABANDONED', message: 'Do better next time.' });
           } else {
             setCurrentGame(null);
           }
@@ -203,6 +301,8 @@ const App: React.FC = () => {
     switch (activeTab) {
       case 'leaderboard':
         return <LeaderboardView />;
+      case 'chat':
+        return <ChatView user={user} />;
       case 'profile':
         return <ProfileView user={user} onUpdateUser={handleUpdateUser} />;
       case 'settings':
@@ -213,7 +313,7 @@ const App: React.FC = () => {
             <header className="flex justify-between items-center mb-10">
               <div>
                 <h1 className="text-3xl font-cinzel gold-text-gradient font-bold">ARKUMEN</h1>
-                <p className="text-gray-400 text-xs tracking-[0.2em] font-bold">THE ELITE TRIVIA ARENA</p>
+                <p className="text-gray-400 text-xs tracking-[0.2em] font-bold uppercase">the the elite quiz arena</p>
               </div>
               <div 
                 onClick={() => setActiveTab('profile')}
@@ -432,6 +532,43 @@ const App: React.FC = () => {
   return (
     <div className="min-h-screen relative max-w-md mx-auto bg-[#050b18] overflow-x-hidden border-x border-slate-800 shadow-[0_0_100px_rgba(212,175,55,0.05)]">
       {renderContent()}
+
+      {summaryStats && (
+        <div className="fixed inset-0 z-[100] bg-[#050b18]/95 backdrop-blur-md flex items-center justify-center p-6 animate-in fade-in duration-300">
+          <div className="max-w-md w-full glass-card p-8 rounded-3xl border border-[#d4af37]/30 text-center relative overflow-hidden shadow-2xl shadow-yellow-500/10">
+            {/* Background Glow */}
+            <div className={`absolute -top-24 -left-24 w-48 h-48 rounded-full blur-[80px] opacity-20 ${summaryStats.won ? 'bg-yellow-500' : 'bg-red-500'}`}></div>
+            
+            <div className="relative z-10">
+              <div className={`text-5xl mb-4 font-cinzel font-black tracking-tighter ${summaryStats.won ? 'gold-text-gradient' : 'text-red-500'}`}>
+                {summaryStats.grade}
+              </div>
+              
+              <h2 className="text-xl font-cinzel text-white font-bold mb-2 uppercase tracking-widest">Challenge Complete</h2>
+              <p className="text-gray-400 text-sm mb-8 italic">"{summaryStats.message}"</p>
+              
+              <div className="grid grid-cols-2 gap-4 mb-8">
+                <div className="bg-slate-900/50 p-4 rounded-2xl border border-slate-800">
+                  <div className="text-[10px] text-gray-500 uppercase font-bold mb-1">Score</div>
+                  <div className="text-2xl font-cinzel text-[#d4af37]">{summaryStats.score}</div>
+                </div>
+                <div className="bg-slate-900/50 p-4 rounded-2xl border border-slate-800">
+                  <div className="text-[10px] text-gray-500 uppercase font-bold mb-1">Best Streak</div>
+                  <div className="text-2xl font-cinzel text-[#d4af37]">{summaryStats.streak}</div>
+                </div>
+              </div>
+              
+              <button 
+                onClick={() => setSummaryStats(null)}
+                className="w-full py-4 gold-gradient text-slate-900 font-bold rounded-xl shadow-xl hover:scale-105 transition-all transform active:scale-95"
+              >
+                RETURN TO LOBBY
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <Navigation activeTab={activeTab} onTabChange={(tab) => {
         setActiveTab(tab);
         setShowAcademicMenu(false);

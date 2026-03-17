@@ -22,7 +22,8 @@ import {
   Users,
   Settings as SettingsIcon,
   Eye,
-  EyeOff
+  EyeOff,
+  MessageCircle
 } from 'lucide-react';
 import { Category, GameMode } from './types';
 
@@ -45,7 +46,6 @@ export const ACADEMIC_SUBJECTS: Category[] = [
 
 export const TRIVIA_CATEGORIES: Category[] = [
   'General Knowledge',
-  'Pop Culture',
   'Science & Nature',
   'History',
   'Geography (General)',
@@ -123,6 +123,7 @@ export const GAME_MODES = [
 export const NAV_ITEMS = [
   { id: 'home', label: 'Home', icon: <Home className="w-6 h-6" /> },
   { id: 'leaderboard', label: 'Ranks', icon: <Trophy className="w-6 h-6" /> },
+  { id: 'chat', label: 'Chat', icon: <MessageCircle className="w-6 h-6" /> },
   { id: 'profile', label: 'Profile', icon: <UserIcon className="w-6 h-6" /> },
   { id: 'settings', label: 'Settings', icon: <SettingsIcon className="w-6 h-6" /> },
 ];
@@ -143,7 +144,8 @@ export const ICONS = {
   Users,
   SettingsIcon,
   Eye,
-  EyeOff
+  EyeOff,
+  MessageCircle
 };
 
 export const REVELATIONS_QUESTIONS = [
