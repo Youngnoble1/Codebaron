@@ -1,8 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
-import { db, auth } from './firebase';
-import { doc, getDoc, setDoc, updateDoc, getDocFromServer } from 'firebase/firestore';
-import { signInAnonymously, onAuthStateChanged } from 'firebase/auth';
+import { db } from './firebase';
+import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
 import { User, GameMode, Category } from './types';
 import { GAME_MODES, TRIVIA_CATEGORIES, ACADEMIC_SUBJECTS, ICONS } from './constants';
 import { prewarmCache } from './services/geminiService';
@@ -48,23 +47,27 @@ const handleFirestoreError = (error: unknown, operationType: OperationType, path
   const errInfo: FirestoreErrorInfo = {
     error: error instanceof Error ? error.message : String(error),
     authInfo: {
-      userId: auth.currentUser?.uid,
-      email: auth.currentUser?.email,
-      emailVerified: auth.currentUser?.emailVerified,
-      isAnonymous: auth.currentUser?.isAnonymous,
-      tenantId: auth.currentUser?.tenantId,
-      providerInfo: auth.currentUser?.providerData.map(provider => ({
-        providerId: provider.providerId,
-        displayName: provider.displayName,
-        email: provider.email,
-        photoUrl: provider.photoURL
-      })) || []
+      userId: localStorage.getItem(GUEST_ID_KEY) || 'unknown',
+      email: undefined,
+      emailVerified: undefined,
+      isAnonymous: true,
+      tenantId: undefined,
+      providerInfo: []
     },
     operationType,
     path
   };
   console.error('Firestore Error: ', JSON.stringify(errInfo));
   throw new Error(JSON.stringify(errInfo));
+};
+
+const getPersistentId = () => {
+  let id = localStorage.getItem(GUEST_ID_KEY);
+  if (!id) {
+    id = 'warrior_' + Math.random().toString(36).substr(2, 9) + Date.now().toString(36).substr(-4);
+    localStorage.setItem(GUEST_ID_KEY, id);
+  }
+  return id;
 };
 
 const App: React.FC = () => {
@@ -84,41 +87,12 @@ const App: React.FC = () => {
     // Pre-warm cache for common categories immediately
     prewarmCache(['General Knowledge', 'Science & Nature']);
 
-    let isInitializing = false;
-
-    const initUser = async (firebaseUser: any) => {
-      if (isInitializing) return;
-      isInitializing = true;
-
+    const initUser = async () => {
       try {
         console.log("Initializing warrior session...");
         
-        // Test connection
-        try {
-          await getDocFromServer(doc(db, 'test', 'connection'));
-        } catch (e) {
-          // Ignore connection test errors unless they are "offline"
-          if (e instanceof Error && e.message.includes('the client is offline')) {
-            console.error("Firebase connection error: the client is offline");
-          }
-        }
-
-        let userId = firebaseUser?.uid;
-        
-        if (!userId) {
-          console.log("No active session found. Signing in anonymously...");
-          try {
-            const userCredential = await signInAnonymously(auth);
-            userId = userCredential.user.uid;
-            console.log("Anonymous sign-in successful:", userId);
-          } catch (authError: any) {
-            console.error("Authentication failed:", authError);
-            if (authError.code === 'auth/operation-not-allowed') {
-              console.error("Anonymous authentication is not enabled in the Firebase Console.");
-            }
-            throw authError;
-          }
-        }
+        const userId = getPersistentId();
+        console.log("Using persistent ID:", userId);
 
         const userDocRef = doc(db, 'users', userId);
         let userDocSnap;
@@ -137,7 +111,7 @@ const App: React.FC = () => {
           // Create new guest profile
           const newUser: User = {
             id: userId,
-            username: `Guest_${userId.substr(-4)}`,
+            username: `Warrior_${userId.substr(-4)}`,
             email: '',
             royaltyPoints: 0,
             highestScore: 0,
@@ -176,21 +150,12 @@ const App: React.FC = () => {
         }
       } catch (error: any) {
         console.error("CRITICAL: Error initializing guest user", error);
-        // If it's a quota error, we should inform the user
-        if (error.message?.includes('Quota exceeded')) {
-          console.error("Firestore quota exceeded. Please check your Firebase billing plan.");
-        }
       } finally {
         setLoading(false);
-        isInitializing = false;
       }
     };
 
-    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
-      initUser(firebaseUser);
-    });
-
-    return () => unsubscribe();
+    initUser();
   }, []);
 
   const handleUpdateUser = async (updates: Partial<User>) => {
