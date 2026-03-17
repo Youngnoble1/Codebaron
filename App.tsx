@@ -253,18 +253,6 @@ const App: React.FC = () => {
 
     setSummaryStats(stats);
 
-    if (stats.won) {
-      const win = window as any;
-      if (win.confetti) {
-        win.confetti({
-          particleCount: 200,
-          spread: 70,
-          origin: { y: 0.6 },
-          colors: ['#d4af37', '#f9d976', '#ffffff']
-        });
-      }
-    }
-
     setCurrentGame(null);
     setShowAcademicMenu(false);
     setShowUMEMenu(false);

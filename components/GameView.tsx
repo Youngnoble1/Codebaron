@@ -241,12 +241,6 @@ const GameView: React.FC<GameViewProps> = ({ mode, category, user, onGameEnd, on
               <ICONS.Award className="w-4 h-4 text-[#d4af37]" />
               <span className="font-cinzel text-xl gold-text-gradient">{state.score.toLocaleString()}</span>
             </div>
-            {state.streak > 0 && (
-              <div className="flex items-center gap-1.5 animate-in slide-in-from-right-2 fade-in">
-                <ICONS.Zap className="w-4 h-4 text-amber-400 fill-amber-400/20" />
-                <span className="text-sm font-bold text-amber-400">{state.streak}</span>
-              </div>
-            )}
           </div>
         </div>
         <div className="w-10">
