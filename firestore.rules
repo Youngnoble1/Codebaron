@@ -2,64 +2,82 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: users
+    // Document ID: {userId}
+    // Fields:
+    //   - id: string (required) - The user's unique ID
+    //   - username: string (required) - The user's display name
+    //   - email: string (optional) - The user's email address
+    //   - royaltyPoints: number (required) - The user's total points
+    //   - highestScore: number (required) - The user's highest score
+    //   - longestStreak: number (required) - The user's longest streak
+    //   - favoriteCategory: string (required) - The user's favorite category
+    //   - avatar: string (required) - The user's avatar URL
+    //   - playCount: map (required) - A map of category to play count
+    //   - role: string (required) - The user's role (e.g., 'player', 'admin')
+    //   - createdAt: string (required) - The timestamp of account creation
+    //
+    // Collection: leaderboard
+    // Document ID: {userId}
+    // Fields:
+    //   - id: string (required) - The user's unique ID
+    //   - username: string (required) - The user's display name
+    //   - royaltyPoints: number (required) - The user's total points
+    //   - highestScore: number (required) - The user's highest score
+    //   - avatar: string (required) - The user's avatar URL
+    //
+    // ===============================================================
+
+    // ===============================================================
     // Helper Functions
     // ===============================================================
     function isAuthenticated() {
       return request.auth != null;
     }
-    
+
     function isOwner(userId) {
       return isAuthenticated() && request.auth.uid == userId;
     }
 
-    function isAdmin() {
-      return isAuthenticated() && 
-        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
-         (request.auth.token.email == "nonsookoli757@gmail.com" && request.auth.token.email_verified == true));
-    }
-
-    // ===============================================================
-    // Domain Validators
-    // ===============================================================
     function isValidUser(data) {
-      let requiredFields = ['id', 'username', 'royaltyPoints', 'highestScore', 'longestStreak', 'favoriteCategory', 'avatar', 'playCount'];
-      
-      return data.keys().hasAll(requiredFields) &&
-             data.id is string &&
+      return data.keys().hasAll(['id', 'username', 'royaltyPoints', 'highestScore', 'longestStreak', 'favoriteCategory', 'avatar', 'playCount', 'role', 'createdAt']) &&
+             data.id is string && data.id.size() > 0 &&
              data.username is string && data.username.size() > 0 && data.username.size() < 50 &&
-             data.royaltyPoints is number &&
-             data.highestScore is number &&
-             data.longestStreak is number &&
+             data.royaltyPoints is number && data.royaltyPoints >= 0 &&
+             data.highestScore is number && data.highestScore >= 0 &&
+             data.longestStreak is number && data.longestStreak >= 0 &&
              data.favoriteCategory is string &&
              data.avatar is string &&
-             data.playCount is map;
+             data.playCount is map &&
+             data.role in ['player', 'admin'] &&
+             data.createdAt is string;
     }
 
-    function isValidLeaderboard(data) {
-      let requiredFields = ['id', 'username', 'royaltyPoints', 'highestScore', 'avatar'];
-      
-      return data.keys().hasAll(requiredFields) &&
+    function isValidLeaderboardEntry(data) {
+      return data.keys().hasAll(['id', 'username', 'royaltyPoints', 'highestScore', 'avatar']) &&
              data.id is string &&
-             data.username is string &&
-             data.royaltyPoints is number &&
-             data.highestScore is number &&
+             data.username is string && data.username.size() > 0 && data.username.size() < 50 &&
+             data.royaltyPoints is number && data.royaltyPoints >= 0 &&
+             data.highestScore is number && data.highestScore >= 0 &&
              data.avatar is string;
     }
 
-    // ===============================================================
-    // Rules
-    // ===============================================================
     match /users/{userId} {
-      allow read: if isOwner(userId) || isAdmin();
+      allow read: if isAuthenticated();
       allow create: if isOwner(userId) && isValidUser(request.resource.data);
-      allow update: if (isOwner(userId) || isAdmin()) && isValidUser(request.resource.data);
-      allow delete: if isAdmin();
+      allow update: if isOwner(userId) && isValidUser(request.resource.data);
     }
 
     match /leaderboard/{userId} {
+      allow read: if isAuthenticated();
+      allow create, update: if isOwner(userId) && isValidLeaderboardEntry(request.resource.data);
+    }
+
+    match /test/connection {
       allow read: if true;
-      allow create, update: if isOwner(userId) && isValidLeaderboard(request.resource.data);
-      allow delete: if isAdmin();
     }
   }
 }

@@ -1,46 +1,46 @@
 {
   "entities": {
     "User": {
-      "title": "User",
-      "description": "User profile and stats",
+      "title": "User Profile",
+      "description": "The user's unique profile data.",
       "type": "object",
       "properties": {
-        "id": { "type": "string" },
-        "username": { "type": "string" },
-        "email": { "type": "string" },
-        "royaltyPoints": { "type": "integer" },
-        "highestScore": { "type": "integer" },
-        "longestStreak": { "type": "integer" },
-        "favoriteCategory": { "type": "string" },
-        "avatar": { "type": "string" },
-        "playCount": { "type": "object" },
-        "role": { "type": "string" },
-        "createdAt": { "type": "string", "format": "date-time" }
+        "id": { "type": "string", "description": "The user's unique ID" },
+        "username": { "type": "string", "description": "The user's display name" },
+        "email": { "type": "string", "format": "email", "description": "The user's email address" },
+        "royaltyPoints": { "type": "number", "description": "The user's total points" },
+        "highestScore": { "type": "number", "description": "The user's highest score" },
+        "longestStreak": { "type": "number", "description": "The user's longest streak" },
+        "favoriteCategory": { "type": "string", "description": "The user's favorite category" },
+        "avatar": { "type": "string", "description": "The user's avatar URL" },
+        "playCount": { "type": "object", "description": "A map of category to play count" },
+        "role": { "type": "string", "enum": ["player", "admin"], "description": "The user's role" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "The timestamp of account creation" }
       },
-      "required": ["id", "username"]
+      "required": ["id", "username", "royaltyPoints", "highestScore", "longestStreak", "favoriteCategory", "avatar", "playCount", "role", "createdAt"]
     },
     "LeaderboardEntry": {
-      "title": "LeaderboardEntry",
-      "description": "Public leaderboard entry",
+      "title": "Leaderboard Entry",
+      "description": "The user's data for the global leaderboard.",
       "type": "object",
       "properties": {
-        "id": { "type": "string" },
-        "username": { "type": "string" },
-        "royaltyPoints": { "type": "integer" },
-        "highestScore": { "type": "integer" },
-        "avatar": { "type": "string" }
+        "id": { "type": "string", "description": "The user's unique ID" },
+        "username": { "type": "string", "description": "The user's display name" },
+        "royaltyPoints": { "type": "number", "description": "The user's total points" },
+        "highestScore": { "type": "number", "description": "The user's highest score" },
+        "avatar": { "type": "string", "description": "The user's avatar URL" }
       },
-      "required": ["id", "username"]
+      "required": ["id", "username", "royaltyPoints", "highestScore", "avatar"]
     }
   },
   "firestore": {
     "/users/{userId}": {
       "schema": "User",
-      "description": "User documents"
+      "description": "The user's unique profile data."
     },
     "/leaderboard/{userId}": {
       "schema": "LeaderboardEntry",
-      "description": "Leaderboard documents"
+      "description": "The user's data for the global leaderboard."
     }
   }
 }

@@ -6,7 +6,6 @@ import { signInAnonymously, onAuthStateChanged } from 'firebase/auth';
 import { User, GameMode, Category } from './types';
 import { GAME_MODES, TRIVIA_CATEGORIES, ACADEMIC_SUBJECTS, ICONS } from './constants';
 import { prewarmCache } from './services/geminiService';
-// import Auth from './components/Auth';
 import Navigation from './components/Navigation';
 import GameView from './components/GameView';
 import ProfileView from './components/ProfileView';
@@ -219,7 +218,7 @@ const App: React.FC = () => {
         changedLeaderboardFields.forEach(field => {
           leaderboardUpdates[field] = (updates as any)[field];
         });
-
+ 
         try {
           await setDoc(doc(db, 'leaderboard', user.id), leaderboardUpdates, { merge: true });
           console.log('Leaderboard updated successfully');
