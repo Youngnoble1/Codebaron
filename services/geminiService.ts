@@ -30,7 +30,7 @@ const shuffleArray = <T,>(array: T[]): T[] => {
 };
 
 // Cache management
-const CACHE_KEY_PREFIX = 'arkumen_q_cache_v2_';
+const CACHE_KEY_PREFIX = 'arkumen_q_cache_v3_';
 
 // Cleanup old cache versions
 try {
@@ -158,13 +158,18 @@ const fetchFreshQuestions = async (
 ): Promise<Question[]> => {
   const apiKey = process.env.GEMINI_API_KEY || process.env.API_KEY;
   if (!apiKey) {
-    console.warn("Gemini API key is not configured. Using fallback questions.");
-    return shuffleArray(FALLBACK_QUESTIONS).slice(0, count).map(q => ({
+    console.warn("Gemini API key is not configured. Using filtered fallback questions.");
+    const filtered = FALLBACK_QUESTIONS.filter(q => 
+      !category || q.category.toLowerCase() === category.toLowerCase()
+    );
+    const pool = filtered.length > 0 ? filtered : FALLBACK_QUESTIONS;
+    return shuffleArray(pool).slice(0, count).map(q => ({
       ...q,
       category: category || q.category
     }));
   }
   const ai = new GoogleGenAI({ apiKey });
+  console.log(`[AI] Fetching ${count} questions for subject: ${category || "General Knowledge"} (Mode: ${mode || "Standard"})`);
 
   const academicSubjects = [
     'Mathematics', 'English', 'Physics', 'Chemistry', 'Biology', 'Geography', 
@@ -200,9 +205,14 @@ const fetchFreshQuestions = async (
   
   Context: ${context}
   
-  CRITICAL: Ensure every single question is strictly about ${category || "the specified context"}. 
-  Do NOT include questions from other subjects. 
-  For example, if the subject is Mathematics, every question MUST be a mathematical problem or concept.
+  CRITICAL SUBJECT LOCK: 
+  Every single question in this batch MUST be strictly and exclusively about the subject: "${category || "General Knowledge"}". 
+  
+  STRICT PROHIBITION:
+  - If the subject is Mathematics, do NOT include Physics or Chemistry questions.
+  - If the subject is Biology, do NOT include Geography questions.
+  - Do NOT include general knowledge if a specific subject is requested.
+  - Every question must be a core topic within "${category || "General Knowledge"}".
   
   Difficulty level: starting at ${difficultyStart}/36.
   Questions must be accurate, engaging, and have 4 clear options.
@@ -241,8 +251,12 @@ const fetchFreshQuestions = async (
       console.error(`Attempt ${attempt + 1} failed:`, error);
       
       if (attempt === retries) {
-        console.error(`Failed to fetch questions after ${retries + 1} attempts. Using fallbacks.`);
-        return shuffleArray(FALLBACK_QUESTIONS).slice(0, count).map(q => ({
+        console.error(`Failed to fetch questions after ${retries + 1} attempts. Using filtered fallbacks.`);
+        const filtered = FALLBACK_QUESTIONS.filter(q => 
+          !category || q.category.toLowerCase() === category.toLowerCase()
+        );
+        const pool = filtered.length > 0 ? filtered : FALLBACK_QUESTIONS;
+        return shuffleArray(pool).slice(0, count).map(q => ({
           ...q,
           category: category || q.category
         }));

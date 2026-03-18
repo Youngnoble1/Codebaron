@@ -34,7 +34,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({ user, onUpdateUser }) => {
             <div>
               <label className="block text-[10px] text-gray-500 uppercase font-bold mb-1">App Version</label>
               <div className="bg-slate-900/50 p-3 rounded-lg border border-slate-800 text-sm font-medium">
-                v1.0.5 (Cache Refresh)
+                v1.0.6 (Hardened Pool)
               </div>
             </div>
           </div>
