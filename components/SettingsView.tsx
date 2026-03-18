@@ -31,7 +31,33 @@ const SettingsView: React.FC<SettingsViewProps> = ({ user, onUpdateUser }) => {
                 {user.id}
               </div>
             </div>
+            <div>
+              <label className="block text-[10px] text-gray-500 uppercase font-bold mb-1">App Version</label>
+              <div className="bg-slate-900/50 p-3 rounded-lg border border-slate-800 text-sm font-medium">
+                v1.0.5 (Cache Refresh)
+              </div>
+            </div>
           </div>
+        </section>
+
+        <section className="glass-card p-6 rounded-2xl border border-yellow-500/10">
+          <h2 className="text-sm font-bold tracking-widest text-[#d4af37] uppercase mb-4">Question Pool</h2>
+          <p className="text-xs text-gray-500 mb-4">If you are seeing questions that don't match the subject, refresh the pool to fetch fresh ones from the AI.</p>
+          <button 
+            onClick={() => {
+              // Clear all keys starting with arkumen_q_cache_
+              Object.keys(localStorage).forEach(key => {
+                if (key.startsWith('arkumen_q_cache_')) {
+                  localStorage.removeItem(key);
+                }
+              });
+              alert('Question pool cleared. Fresh questions will be fetched on your next game.');
+              window.location.reload();
+            }}
+            className="w-full py-3 bg-yellow-500/10 text-[#d4af37] border border-yellow-500/30 rounded-xl font-bold hover:bg-yellow-500/20 transition-all"
+          >
+            REFRESH QUESTION POOL
+          </button>
         </section>
 
         <section className="glass-card p-6 rounded-2xl border border-red-500/10">

@@ -30,7 +30,19 @@ const shuffleArray = <T,>(array: T[]): T[] => {
 };
 
 // Cache management
-const CACHE_KEY_PREFIX = 'arkumen_q_cache_';
+const CACHE_KEY_PREFIX = 'arkumen_q_cache_v2_';
+
+// Cleanup old cache versions
+try {
+  const oldPrefix = 'arkumen_q_cache_';
+  Object.keys(localStorage).forEach(key => {
+    if (key.startsWith(oldPrefix) && !key.startsWith(CACHE_KEY_PREFIX)) {
+      localStorage.removeItem(key);
+    }
+  });
+} catch (e) {
+  // Ignore localStorage errors
+}
 
 const getCache = (key: string): Question[] => {
   try {

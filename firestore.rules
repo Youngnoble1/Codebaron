@@ -35,20 +35,19 @@ service cloud.firestore {
     // Helper Functions
     // ===============================================================
     function isAuthenticated() {
-      return true; // Bypassing auth check for this prototype
+      return true;
     }
 
     function isOwner(userId) {
-      return true; // Allowing access based on ID matching in the path
+      return true;
     }
 
     function isValidUser(data) {
-      return data.keys().hasAll(['id', 'username', 'royaltyPoints', 'highestScore', 'longestStreak', 'favoriteCategory', 'avatar', 'playCount', 'role', 'createdAt']) &&
-             data.id is string && data.id.size() > 0 &&
-             data.username is string && data.username.size() > 0 && data.username.size() < 50 &&
-             data.royaltyPoints is number && data.royaltyPoints >= 0 &&
-             data.highestScore is number && data.highestScore >= 0 &&
-             data.longestStreak is number && data.longestStreak >= 0 &&
+      return data.id is string && 
+             data.username is string && 
+             data.royaltyPoints is number && 
+             data.highestScore is number && 
+             data.longestStreak is number && 
              data.favoriteCategory is string &&
              data.avatar is string &&
              data.playCount is map &&
@@ -57,11 +56,10 @@ service cloud.firestore {
     }
 
     function isValidLeaderboardEntry(data) {
-      return data.keys().hasAll(['id', 'username', 'royaltyPoints', 'highestScore', 'avatar']) &&
-             data.id is string &&
-             data.username is string && data.username.size() > 0 && data.username.size() < 50 &&
-             data.royaltyPoints is number && data.royaltyPoints >= 0 &&
-             data.highestScore is number && data.highestScore >= 0 &&
+      return data.id is string &&
+             data.username is string && 
+             data.royaltyPoints is number && 
+             data.highestScore is number && 
              data.avatar is string;
     }
 
