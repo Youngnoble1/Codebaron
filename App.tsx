@@ -78,8 +78,13 @@ const App: React.FC = () => {
   const [showAcademicMenu, setShowAcademicMenu] = useState(false);
   const [showUMEMenu, setShowUMEMenu] = useState(false);
   const [showSSCEMenu, setShowSSCEMenu] = useState(false);
+  const [showGCEMenu, setShowGCEMenu] = useState(false);
+  const [showNECOMenu, setShowNECOMenu] = useState(false);
+  const [showJSSCEMenu, setShowJSSCEMenu] = useState(false);
   const [showSpecialistMenu, setShowSpecialistMenu] = useState(false);
   const [showRevelationsMenu, setShowRevelationsMenu] = useState(false);
+  const [isResearching, setIsResearching] = useState(false);
+  const [researchContent, setResearchContent] = useState<string | null>(null);
   const [summaryStats, setSummaryStats] = useState<{ score: number; streak: number; won: boolean; grade: string; message: string } | null>(null);
 
   // Initialize Guest User
@@ -221,6 +226,9 @@ const App: React.FC = () => {
     setShowAcademicMenu(false);
     setShowUMEMenu(false);
     setShowSSCEMenu(false);
+    setShowGCEMenu(false);
+    setShowNECOMenu(false);
+    setShowJSSCEMenu(false);
     setShowSpecialistMenu(false);
     setShowRevelationsMenu(false);
   };
@@ -322,6 +330,9 @@ const App: React.FC = () => {
                         setShowAcademicMenu(false);
                         setShowUMEMenu(false);
                         setShowSSCEMenu(false);
+                        setShowGCEMenu(false);
+                        setShowNECOMenu(false);
+                        setShowJSSCEMenu(false);
                       } else {
                         setCurrentGame({ mode: mode.id, category: 'General Knowledge' });
                       }
@@ -344,14 +355,14 @@ const App: React.FC = () => {
                   className="group relative overflow-hidden glass-card p-6 rounded-2xl border border-pink-500/30 flex items-center gap-6 transition-all duration-300 hover:border-pink-400/50 hover:bg-slate-800/50 active:scale-[0.98]"
                 >
                   <div className="p-4 bg-slate-900 rounded-xl group-hover:scale-110 transition-transform border border-slate-800">
-                    {GAME_MODES[7].icon}
+                    {GAME_MODES[10].icon}
                   </div>
                   <div className="flex-1 text-left">
                     <div className="flex items-center gap-2">
-                      <h3 className="text-lg font-bold font-cinzel group-hover:text-pink-400 transition-colors">{GAME_MODES[7].title}</h3>
+                      <h3 className="text-lg font-bold font-cinzel group-hover:text-pink-400 transition-colors">{GAME_MODES[10].title}</h3>
                       <div className="bg-pink-500/20 text-pink-400 text-[8px] font-bold px-1.5 py-0.5 rounded uppercase border border-pink-500/30">Live</div>
                     </div>
-                    <p className="text-sm text-gray-500">{GAME_MODES[7].description}</p>
+                    <p className="text-sm text-gray-500">{GAME_MODES[10].description}</p>
                   </div>
                 </button>
               </div>
@@ -425,14 +436,14 @@ const App: React.FC = () => {
                 className="group w-full relative overflow-hidden glass-card p-6 rounded-2xl border border-amber-500/30 flex items-center gap-6 transition-all duration-300 hover:border-amber-400/50 hover:bg-slate-800/50 active:scale-[0.98]"
               >
                 <div className="p-4 bg-slate-900 rounded-xl group-hover:scale-110 transition-transform border border-slate-800">
-                  {GAME_MODES[8].icon}
+                  {GAME_MODES[11].icon}
                 </div>
                 <div className="flex-1 text-left">
                   <div className="flex items-center gap-2">
-                    <h3 className="text-lg font-bold font-cinzel group-hover:text-amber-400 transition-colors">{GAME_MODES[8].title}</h3>
+                    <h3 className="text-lg font-bold font-cinzel group-hover:text-amber-400 transition-colors">{GAME_MODES[11].title}</h3>
                     <div className="bg-amber-500/20 text-amber-400 text-[8px] font-bold px-1.5 py-0.5 rounded uppercase border border-amber-500/30">Special</div>
                   </div>
-                  <p className="text-sm text-gray-500">{GAME_MODES[8].description}</p>
+                  <p className="text-sm text-gray-500">{GAME_MODES[11].description}</p>
                 </div>
               </button>
             </div>
@@ -446,6 +457,9 @@ const App: React.FC = () => {
                     setShowUMEMenu(!showUMEMenu);
                     setShowAcademicMenu(false);
                     setShowSSCEMenu(false);
+                    setShowGCEMenu(false);
+                    setShowNECOMenu(false);
+                    setShowJSSCEMenu(false);
                     setShowSpecialistMenu(false);
                   }}
                   className={`group relative overflow-hidden glass-card p-6 rounded-2xl border border-blue-500/30 flex items-center gap-6 transition-all duration-300 hover:border-blue-400/50 hover:bg-slate-800/50 active:scale-[0.98] ${showUMEMenu ? 'bg-slate-800/80 border-blue-400' : ''}`}
@@ -481,6 +495,9 @@ const App: React.FC = () => {
                     setShowSSCEMenu(!showSSCEMenu);
                     setShowAcademicMenu(false);
                     setShowUMEMenu(false);
+                    setShowGCEMenu(false);
+                    setShowNECOMenu(false);
+                    setShowJSSCEMenu(false);
                     setShowSpecialistMenu(false);
                   }}
                   className={`group relative overflow-hidden glass-card p-6 rounded-2xl border border-orange-500/30 flex items-center gap-6 transition-all duration-300 hover:border-orange-400/50 hover:bg-slate-800/50 active:scale-[0.98] ${showSSCEMenu ? 'bg-slate-800/80 border-orange-400' : ''}`}
@@ -505,6 +522,120 @@ const App: React.FC = () => {
                       >
                         <div className="text-[10px] text-gray-400 font-bold uppercase mb-1 truncate">{cat}</div>
                         <div className="text-xs font-bold text-orange-400">Start SSCE</div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                {/* G.C.E Prep */}
+                <button
+                  onClick={() => {
+                    setShowGCEMenu(!showGCEMenu);
+                    setShowAcademicMenu(false);
+                    setShowUMEMenu(false);
+                    setShowSSCEMenu(false);
+                    setShowNECOMenu(false);
+                    setShowJSSCEMenu(false);
+                    setShowSpecialistMenu(false);
+                  }}
+                  className={`group relative overflow-hidden glass-card p-6 rounded-2xl border border-indigo-500/30 flex items-center gap-6 transition-all duration-300 hover:border-indigo-400/50 hover:bg-slate-800/50 active:scale-[0.98] ${showGCEMenu ? 'bg-slate-800/80 border-indigo-400' : ''}`}
+                >
+                  <div className="p-4 bg-slate-900 rounded-xl group-hover:scale-110 transition-transform border border-slate-800">
+                    {GAME_MODES[7].icon}
+                  </div>
+                  <div className="flex-1 text-left">
+                    <h3 className="text-lg font-bold font-cinzel group-hover:text-indigo-400 transition-colors">{GAME_MODES[7].title}</h3>
+                    <p className="text-sm text-gray-500">{GAME_MODES[7].description}</p>
+                  </div>
+                  <div className="bg-indigo-500/20 text-indigo-400 text-[8px] font-bold px-1.5 py-0.5 rounded uppercase border border-indigo-500/30">Past Qs</div>
+                </button>
+
+                {showGCEMenu && (
+                  <div className="grid grid-cols-2 gap-3 animate-in slide-in-from-top-4 my-2">
+                    {ACADEMIC_SUBJECTS.map((cat) => (
+                      <button
+                        key={cat}
+                        onClick={() => setCurrentGame({ mode: GameMode.GCE, category: cat })}
+                        className="glass-card p-4 rounded-xl text-left border border-slate-800 hover:border-indigo-500/50 transition-all active:scale-[0.98]"
+                      >
+                        <div className="text-[10px] text-gray-400 font-bold uppercase mb-1 truncate">{cat}</div>
+                        <div className="text-xs font-bold text-indigo-400">Start GCE</div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                {/* N.E.C.O Challenge */}
+                <button
+                  onClick={() => {
+                    setShowNECOMenu(!showNECOMenu);
+                    setShowAcademicMenu(false);
+                    setShowUMEMenu(false);
+                    setShowSSCEMenu(false);
+                    setShowGCEMenu(false);
+                    setShowJSSCEMenu(false);
+                    setShowSpecialistMenu(false);
+                  }}
+                  className={`group relative overflow-hidden glass-card p-6 rounded-2xl border border-teal-500/30 flex items-center gap-6 transition-all duration-300 hover:border-teal-400/50 hover:bg-slate-800/50 active:scale-[0.98] ${showNECOMenu ? 'bg-slate-800/80 border-teal-400' : ''}`}
+                >
+                  <div className="p-4 bg-slate-900 rounded-xl group-hover:scale-110 transition-transform border border-slate-800">
+                    {GAME_MODES[8].icon}
+                  </div>
+                  <div className="flex-1 text-left">
+                    <h3 className="text-lg font-bold font-cinzel group-hover:text-teal-400 transition-colors">{GAME_MODES[8].title}</h3>
+                    <p className="text-sm text-gray-500">{GAME_MODES[8].description}</p>
+                  </div>
+                  <div className="bg-teal-500/20 text-teal-400 text-[8px] font-bold px-1.5 py-0.5 rounded uppercase border border-teal-500/30">Past Qs</div>
+                </button>
+
+                {showNECOMenu && (
+                  <div className="grid grid-cols-2 gap-3 animate-in slide-in-from-top-4 my-2">
+                    {ACADEMIC_SUBJECTS.map((cat) => (
+                      <button
+                        key={cat}
+                        onClick={() => setCurrentGame({ mode: GameMode.NECO, category: cat })}
+                        className="glass-card p-4 rounded-xl text-left border border-slate-800 hover:border-teal-500/50 transition-all active:scale-[0.98]"
+                      >
+                        <div className="text-[10px] text-gray-400 font-bold uppercase mb-1 truncate">{cat}</div>
+                        <div className="text-xs font-bold text-teal-400">Start NECO</div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                {/* J.S.S.C.E Junior */}
+                <button
+                  onClick={() => {
+                    setShowJSSCEMenu(!showJSSCEMenu);
+                    setShowAcademicMenu(false);
+                    setShowUMEMenu(false);
+                    setShowSSCEMenu(false);
+                    setShowGCEMenu(false);
+                    setShowNECOMenu(false);
+                    setShowSpecialistMenu(false);
+                  }}
+                  className={`group relative overflow-hidden glass-card p-6 rounded-2xl border border-rose-500/30 flex items-center gap-6 transition-all duration-300 hover:border-rose-400/50 hover:bg-slate-800/50 active:scale-[0.98] ${showJSSCEMenu ? 'bg-slate-800/80 border-rose-400' : ''}`}
+                >
+                  <div className="p-4 bg-slate-900 rounded-xl group-hover:scale-110 transition-transform border border-slate-800">
+                    {GAME_MODES[9].icon}
+                  </div>
+                  <div className="flex-1 text-left">
+                    <h3 className="text-lg font-bold font-cinzel group-hover:text-rose-400 transition-colors">{GAME_MODES[9].title}</h3>
+                    <p className="text-sm text-gray-500">{GAME_MODES[9].description}</p>
+                  </div>
+                  <div className="bg-rose-500/20 text-rose-400 text-[8px] font-bold px-1.5 py-0.5 rounded uppercase border border-rose-500/30">Junior</div>
+                </button>
+
+                {showJSSCEMenu && (
+                  <div className="grid grid-cols-2 gap-3 animate-in slide-in-from-top-4 my-2">
+                    {ACADEMIC_SUBJECTS.map((cat) => (
+                      <button
+                        key={cat}
+                        onClick={() => setCurrentGame({ mode: GameMode.JSSCE, category: cat })}
+                        className="glass-card p-4 rounded-xl text-left border border-slate-800 hover:border-rose-500/50 transition-all active:scale-[0.98]"
+                      >
+                        <div className="text-[10px] text-gray-400 font-bold uppercase mb-1 truncate">{cat}</div>
+                        <div className="text-xs font-bold text-rose-400">Start JSSCE</div>
                       </button>
                     ))}
                   </div>

@@ -92,6 +92,26 @@ export const fetchQuestions = async (
   return shuffleArray(unique).slice(0, count).map(randomizeOptions);
 };
 
+export const researchTopic = async (topic: string, context: string): Promise<string> => {
+  const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+  try {
+    const response = await ai.models.generateContent({
+      model: 'gemini-3-flash-preview',
+      contents: `Research and provide a concise educational summary about the topic: "${topic}". 
+      Context: This topic appeared in a question about: "${context}".
+      Provide key facts, historical context if relevant, and core concepts that a student should know. 
+      Format the output in clean Markdown with sections.`,
+      config: {
+        systemInstruction: "You are an expert academic tutor. Provide clear, accurate, and concise educational content.",
+      }
+    });
+    return response.text || "No research data found.";
+  } catch (error) {
+    console.error('Research error:', error);
+    return "Failed to fetch research data. Please try again later.";
+  }
+};
+
 export const prewarmCache = async (categories: string[]) => {
   // Fetch 10 questions for each category in background
   for (const cat of categories) {
@@ -126,7 +146,13 @@ const fetchFreshQuestions = async (
   if (mode === 'UME') {
     context = `JAMB (Unified Tertiary Matriculation Examination) past questions for the subject: ${category || "General Knowledge"}. Focus on high-level secondary school exit standards in Nigeria.`;
   } else if (mode === 'SSCE') {
-    context = `WAEC/NECO (Senior Secondary Certificate Examination) past questions for the subject: ${category || "General Knowledge"}. Focus on standard West African secondary school curriculum.`;
+    context = `WAEC (West African Examinations Council) past questions for the subject: ${category || "General Knowledge"}. Focus on standard West African secondary school curriculum.`;
+  } else if (mode === 'GCE') {
+    context = `GCE (General Certificate Examination) past questions for the subject: ${category || "General Knowledge"}. Focus on international secondary school standards.`;
+  } else if (mode === 'NECO') {
+    context = `NECO (National Examinations Council) past questions for the subject: ${category || "General Knowledge"}. Focus on Nigerian national secondary school curriculum.`;
+  } else if (mode === 'JSSCE') {
+    context = `JSSCE (Junior Secondary School Certificate Examination) past questions for the subject: ${category || "General Knowledge"}. Focus on junior secondary school curriculum in Nigeria.`;
   } else if (isAcademic) {
     context = `Subject: ${category}. Ensure questions cover concepts typical for Nigerian and international secondary school curricula.`;
   } else {

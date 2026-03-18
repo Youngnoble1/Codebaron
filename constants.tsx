@@ -22,7 +22,9 @@ import {
   Users,
   Settings as SettingsIcon,
   Eye,
-  EyeOff
+  EyeOff,
+  Search,
+  Download
 } from 'lucide-react';
 import { Category, GameMode } from './types';
 
@@ -100,8 +102,29 @@ export const GAME_MODES = [
     id: GameMode.SSCE,
     title: 'S.S.C.E Mastery',
     icon: <BookOpen className="w-8 h-8 text-[#d4af37]" />,
-    description: '70 WAEC/NECO past questions by subject.',
+    description: '70 WAEC past questions by subject.',
     color: 'from-orange-700 to-red-800'
+  },
+  {
+    id: GameMode.GCE,
+    title: 'G.C.E Prep',
+    icon: <Award className="w-8 h-8 text-[#d4af37]" />,
+    description: 'General Certificate Examination past questions.',
+    color: 'from-indigo-700 to-blue-900'
+  },
+  {
+    id: GameMode.NECO,
+    title: 'N.E.C.O Challenge',
+    icon: <GraduationCap className="w-8 h-8 text-[#d4af37]" />,
+    description: 'National Examination Council past questions.',
+    color: 'from-teal-700 to-emerald-900'
+  },
+  {
+    id: GameMode.JSSCE,
+    title: 'J.S.S.C.E Junior',
+    icon: <BookOpen className="w-8 h-8 text-[#d4af37]" />,
+    description: 'Junior Secondary School Certificate Exam prep.',
+    color: 'from-rose-700 to-pink-900'
   },
   {
     id: GameMode.MULTIPLAYER,
@@ -142,7 +165,9 @@ export const ICONS = {
   Users,
   SettingsIcon,
   Eye,
-  EyeOff
+  EyeOff,
+  Search,
+  Download
 };
 
 export const REVELATIONS_QUESTIONS = [

@@ -7,6 +7,9 @@ export enum GameMode {
   ACADEMIC = 'ACADEMIC',
   UME = 'UME',
   SSCE = 'SSCE',
+  GCE = 'GCE',
+  NECO = 'NECO',
+  JSSCE = 'JSSCE',
   MULTIPLAYER = 'MULTIPLAYER',
   REVELATIONS = 'REVELATIONS'
 }

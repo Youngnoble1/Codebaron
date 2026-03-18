@@ -1,0 +1,18 @@
+{
+  "short_name": "Arkumen",
+  "name": "Arkumen Quiz Arena",
+  "description": "The ultimate arena for trivia warriors.",
+  "icons": [
+    {
+      "src": "https://api.dicebear.com/7.x/shapes/svg?seed=arkumen&backgroundColor=0a0a0a",
+      "type": "image/svg+xml",
+      "sizes": "512x512",
+      "purpose": "any maskable"
+    }
+  ],
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "theme_color": "#0a0a0a",
+  "background_color": "#0a0a0a"
+}
