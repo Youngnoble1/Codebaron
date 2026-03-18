@@ -29,7 +29,16 @@ export type Category =
   | 'Science & Nature'
   | 'History'
   | 'Geography (General)'
-  | 'Revelations';
+  | 'Revelations'
+  | 'English Studies'
+  | 'Intermediate Science'
+  | 'Digital Technologies'
+  | 'Social & Citizenship Studies'
+  | 'Physical & Health Education'
+  | 'Religious Studies (CRS)'
+  | 'Cultural & Creative Arts'
+  | 'Nigerian Languages'
+  | 'French';
 
 export interface Question {
   id: string;

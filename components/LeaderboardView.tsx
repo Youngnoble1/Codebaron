@@ -18,7 +18,10 @@ const LeaderboardView: React.FC = () => {
     );
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      const leaderboardData = snapshot.docs.map(doc => doc.data() as LeaderboardEntry);
+      const leaderboardData = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      } as LeaderboardEntry));
       setLeaders(leaderboardData);
       setLoading(false);
     }, (err) => {

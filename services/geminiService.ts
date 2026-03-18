@@ -61,7 +61,13 @@ export const fetchQuestions = async (
   const cachedQuestions = getCache(cacheKey);
 
   // Determine if it is an academic subject or trivia
-  const academicSubjects = ['Mathematics', 'English', 'Physics', 'Chemistry', 'Biology', 'Geography', 'Basic Science', 'Nigerian History', 'Global Current Affairs', 'Nigerian Current Affairs'];
+  const academicSubjects = [
+    'Mathematics', 'English', 'Physics', 'Chemistry', 'Biology', 'Geography', 
+    'Basic Science', 'Nigerian History', 'Global Current Affairs', 'Nigerian Current Affairs',
+    'English Studies', 'Intermediate Science', 'Digital Technologies', 'Social & Citizenship Studies',
+    'Physical & Health Education', 'Religious Studies (CRS)', 'Cultural & Creative Arts', 'Nigerian Languages',
+    'French'
+  ];
   const isAcademic = category && academicSubjects.includes(category);
 
   // If we have enough in cache, return them but also fetch a few fresh ones in background
@@ -148,7 +154,13 @@ const fetchFreshQuestions = async (
   }
   const ai = new GoogleGenAI({ apiKey });
 
-  const academicSubjects = ['Mathematics', 'English', 'Physics', 'Chemistry', 'Biology', 'Geography', 'Basic Science', 'Nigerian History', 'Global Current Affairs', 'Nigerian Current Affairs'];
+  const academicSubjects = [
+    'Mathematics', 'English', 'Physics', 'Chemistry', 'Biology', 'Geography', 
+    'Basic Science', 'Nigerian History', 'Global Current Affairs', 'Nigerian Current Affairs',
+    'English Studies', 'Intermediate Science', 'Digital Technologies', 'Social & Citizenship Studies',
+    'Physical & Health Education', 'Religious Studies (CRS)', 'Cultural & Creative Arts', 'Nigerian Languages',
+    'French'
+  ];
   const isAcademic = category && academicSubjects.includes(category);
 
   let context = "";
@@ -161,7 +173,10 @@ const fetchFreshQuestions = async (
   } else if (mode === 'NECO') {
     context = `NECO (National Examinations Council) past questions for the subject: ${category || "General Knowledge"}. Focus on Nigerian national secondary school curriculum.`;
   } else if (mode === 'JSSCE') {
-    context = `JSSCE (Junior Secondary School Certificate Examination) past questions for the subject: ${category || "General Knowledge"}. Focus on junior secondary school curriculum in Nigeria.`;
+    context = `JSSCE (Junior Secondary School Certificate Examination) past questions for the subject: ${category || "General Knowledge"}. 
+    IMPORTANT: Follow the new Nigerian JSS curriculum (2025/2026 overhaul). 
+    Focus on practical vocational skills, digital literacy (coding, robotics), and national identity (Nigerian History). 
+    Intermediate Science replaces Basic Science. English Studies includes literature.`;
   } else if (isAcademic) {
     context = `Subject: ${category}. Ensure questions cover concepts typical for Nigerian and international secondary school curricula.`;
   } else {
@@ -173,8 +188,16 @@ const fetchFreshQuestions = async (
   
   Context: ${context}
   
+  CRITICAL: Ensure every single question is strictly about ${category || "the specified context"}. 
+  Do NOT include questions from other subjects. 
+  For example, if the subject is Mathematics, every question MUST be a mathematical problem or concept.
+  
   Difficulty level: starting at ${difficultyStart}/36.
   Questions must be accurate, engaging, and have 4 clear options.
+  
+  To ensure variety and reduce repetition, use the following random seed for this session: ${Date.now()}_${Math.random()}.
+  Generate completely different questions from any previous sessions.
+  
   Output the response as a JSON array of question objects.`;
 
   for (let attempt = 0; attempt <= retries; attempt++) {
@@ -187,7 +210,8 @@ const fetchFreshQuestions = async (
           responseSchema: {
             type: Type.ARRAY,
             items: QUESTION_SCHEMA
-          }
+          },
+          tools: [{ googleSearch: {} }]
         }
       });
 

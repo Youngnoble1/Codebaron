@@ -24,7 +24,8 @@ import {
   Eye,
   EyeOff,
   Search,
-  Download
+  Download,
+  Library
 } from 'lucide-react';
 import { Category, GameMode } from './types';
 
@@ -42,7 +43,22 @@ export const ACADEMIC_SUBJECTS: Category[] = [
   'Basic Science',
   'Nigerian History',
   'Global Current Affairs',
-  'Nigerian Current Affairs'
+  'Nigerian Current Affairs',
+  'French'
+];
+
+export const JSSCE_SUBJECTS: Category[] = [
+  'English Studies',
+  'Mathematics',
+  'Nigerian Languages',
+  'Intermediate Science',
+  'Digital Technologies',
+  'Nigerian History',
+  'Social & Citizenship Studies',
+  'Physical & Health Education',
+  'Religious Studies (CRS)',
+  'Cultural & Creative Arts',
+  'French'
 ];
 
 export const TRIVIA_CATEGORIES: Category[] = [
@@ -167,7 +183,8 @@ export const ICONS = {
   Eye,
   EyeOff,
   Search,
-  Download
+  Download,
+  Library
 };
 
 export const REVELATIONS_QUESTIONS = [
@@ -578,7 +595,7 @@ export const REVELATIONS_QUESTIONS = [
   },
   {
     id: 'rev-31',
-    text: 'According to the Prophet, what are God the Father, God the Son, and God the Most Holy Spirit?',
+    text: 'According to the Prophet, what is the accurate explanation of God the Father, God the Son, and God the Most Holy Spirit?',
     options: [
       'Three different people working together.',
       'Three different modes of operation of the God of Creation.',

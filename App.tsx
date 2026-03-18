@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { db } from './firebase';
 import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
 import { User, GameMode, Category } from './types';
-import { GAME_MODES, TRIVIA_CATEGORIES, ACADEMIC_SUBJECTS, ICONS } from './constants';
+import { GAME_MODES, TRIVIA_CATEGORIES, ACADEMIC_SUBJECTS, JSSCE_SUBJECTS, ICONS } from './constants';
 import { prewarmCache } from './services/geminiService';
 import Navigation from './components/Navigation';
 import GameView from './components/GameView';
@@ -11,6 +11,7 @@ import ProfileView from './components/ProfileView';
 import SettingsView from './components/SettingsView';
 import LeaderboardView from './components/LeaderboardView';
 import MultiplayerView from './components/MultiplayerView';
+import LibraryView from './components/LibraryView';
 import ErrorBoundary from './components/ErrorBoundary';
 
 const GUEST_ID_KEY = 'arkumen_guest_id';
@@ -298,6 +299,8 @@ const App: React.FC = () => {
     switch (activeTab) {
       case 'leaderboard':
         return <LeaderboardView />;
+      case 'library':
+        return <LibraryView />;
       case 'profile':
         return <ProfileView user={user} onUpdateUser={handleUpdateUser} />;
       case 'settings':
@@ -628,7 +631,7 @@ const App: React.FC = () => {
 
                 {showJSSCEMenu && (
                   <div className="grid grid-cols-2 gap-3 animate-in slide-in-from-top-4 my-2">
-                    {ACADEMIC_SUBJECTS.map((cat) => (
+                    {JSSCE_SUBJECTS.map((cat) => (
                       <button
                         key={cat}
                         onClick={() => setCurrentGame({ mode: GameMode.JSSCE, category: cat })}
@@ -641,6 +644,25 @@ const App: React.FC = () => {
                   </div>
                 )}
               </div>
+            </div>
+
+            <div className="mb-8">
+              <h2 className="text-sm font-bold tracking-widest text-[#d4af37] uppercase mb-4">Study Resources</h2>
+              <button
+                onClick={() => setActiveTab('library')}
+                className="group w-full relative overflow-hidden glass-card p-6 rounded-2xl border border-emerald-500/30 flex items-center gap-6 transition-all duration-300 hover:border-emerald-400/50 hover:bg-slate-800/50 active:scale-[0.98]"
+              >
+                <div className="p-4 bg-slate-900 rounded-xl group-hover:scale-110 transition-transform border border-slate-800">
+                  <ICONS.Library className="w-8 h-8 text-emerald-400" />
+                </div>
+                <div className="flex-1 text-left">
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-lg font-bold font-cinzel group-hover:text-emerald-400 transition-colors">Academic Library</h3>
+                    <div className="bg-emerald-500/20 text-emerald-400 text-[8px] font-bold px-1.5 py-0.5 rounded uppercase border border-emerald-500/30">Free PDFS</div>
+                  </div>
+                  <p className="text-sm text-gray-500">Download official textbooks and study materials.</p>
+                </div>
+              </button>
             </div>
           </div>
         );
