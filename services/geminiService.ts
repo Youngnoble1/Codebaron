@@ -1,6 +1,7 @@
 
 import { GoogleGenAI, Type } from "@google/genai";
 import { Question, Category } from "../types";
+import { FALLBACK_QUESTIONS } from "./fallbackQuestions";
 
 const QUESTION_SCHEMA = {
   type: Type.OBJECT,
@@ -93,7 +94,11 @@ export const fetchQuestions = async (
 };
 
 export const researchTopic = async (topic: string, context: string): Promise<string> => {
-  const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+  const apiKey = process.env.GEMINI_API_KEY || process.env.API_KEY;
+  if (!apiKey) {
+    return `### ${topic}\n\n*Educational summary is currently unavailable because the AI service is not configured.*\n\n**Topic Context:** ${context}\n\nTo enable AI research, please configure your Gemini API key in the environment variables.`;
+  }
+  const ai = new GoogleGenAI({ apiKey });
   try {
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
@@ -135,7 +140,11 @@ const fetchFreshQuestions = async (
 ): Promise<Question[]> => {
   const apiKey = process.env.GEMINI_API_KEY || process.env.API_KEY;
   if (!apiKey) {
-    throw new Error("Gemini API key is not configured. Please check your environment.");
+    console.warn("Gemini API key is not configured. Using fallback questions.");
+    return shuffleArray(FALLBACK_QUESTIONS).slice(0, count).map(q => ({
+      ...q,
+      category: category || q.category
+    }));
   }
   const ai = new GoogleGenAI({ apiKey });
 
@@ -196,7 +205,11 @@ const fetchFreshQuestions = async (
       console.error(`Attempt ${attempt + 1} failed:`, error);
       
       if (attempt === retries) {
-        throw new Error(`Failed to fetch questions after ${retries + 1} attempts: ${error.message}`);
+        console.error(`Failed to fetch questions after ${retries + 1} attempts. Using fallbacks.`);
+        return shuffleArray(FALLBACK_QUESTIONS).slice(0, count).map(q => ({
+          ...q,
+          category: category || q.category
+        }));
       }
       
       // Exponential backoff: 1s, 2s, 4s...
