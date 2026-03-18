@@ -1,7 +1,7 @@
 
 import { GoogleGenAI, Type } from "@google/genai";
 import { Question, Category } from "../types";
-import { FALLBACK_QUESTIONS } from "./fallbackQuestions";
+import { QUESTION_BANK } from "./questionBank";
 
 const QUESTION_SCHEMA = {
   type: Type.OBJECT,
@@ -30,7 +30,7 @@ const shuffleArray = <T,>(array: T[]): T[] => {
 };
 
 // Cache management
-const CACHE_KEY_PREFIX = 'arkumen_q_cache_v3_';
+const CACHE_KEY_PREFIX = 'arkumen_q_cache_v4_';
 
 // Cleanup old cache versions
 try {
@@ -72,43 +72,47 @@ export const fetchQuestions = async (
   const cacheKey = mode && category ? `${mode}_${category}` : (mode || category || 'General Knowledge');
   const cachedQuestions = getCache(cacheKey);
 
-  // Determine if it is an academic subject or trivia
-  const academicSubjects = [
-    'Mathematics', 'English', 'Physics', 'Chemistry', 'Biology', 'Geography', 
-    'Basic Science', 'Nigerian History', 'Global Current Affairs', 'Nigerian Current Affairs',
-    'English Studies', 'Intermediate Science', 'Digital Technologies', 'Social & Citizenship Studies',
-    'Physical & Health Education', 'Religious Studies (CRS)', 'Cultural & Creative Arts', 'Nigerian Languages',
-    'French'
-  ];
-  const isAcademic = category && academicSubjects.includes(category);
+  // 1. Check local static bank first (Guaranteed subject accuracy)
+  const staticQuestions = category ? (QUESTION_BANK[category] || []) : QUESTION_BANK['General Knowledge'];
+  
+  // If we have enough in cache or static bank, use them
+  const pool = [...cachedQuestions, ...staticQuestions];
+  const uniquePool = Array.from(new Map(pool.map(q => [q.text, q])).values());
 
-  // If we have enough in cache, return them but also fetch a few fresh ones in background
-  if (cachedQuestions.length >= count) {
-    // Return randomized selection from cache
-    const selected = shuffleArray(cachedQuestions).slice(0, count);
+  if (uniquePool.length >= count) {
+    const selected = shuffleArray(uniquePool).slice(0, count);
     
-    // Background fetch 5 fresh questions to keep the pool updated
-    fetchFreshQuestions(5, category, difficultyStart, mode)
-      .then(fresh => {
-        const updatedCache = [...cachedQuestions, ...fresh];
-        // Remove duplicates by text
-        const unique = Array.from(new Map(updatedCache.map(q => [q.text, q])).values());
-        setCache(cacheKey, unique);
-      })
-      .catch(err => {
-        console.warn("Background question fetch failed:", err);
-      });
+    // Background fetch fresh ones to keep the pool updated if API key exists
+    const apiKey = process.env.GEMINI_API_KEY || process.env.API_KEY;
+    if (apiKey) {
+      fetchFreshQuestions(5, category, difficultyStart, mode)
+        .then(fresh => {
+          const updatedCache = [...cachedQuestions, ...fresh];
+          const unique = Array.from(new Map(updatedCache.map(q => [q.text, q])).values());
+          setCache(cacheKey, unique);
+        })
+        .catch(() => {});
+    }
 
     return selected.map(randomizeOptions);
   }
 
-  // Not enough in cache, fetch full batch
-  const fresh = await fetchFreshQuestions(count, category, difficultyStart, mode);
-  const updatedCache = [...cachedQuestions, ...fresh];
-  const unique = Array.from(new Map(updatedCache.map(q => [q.text, q])).values());
-  setCache(cacheKey, unique);
+  // 2. If pool is small and API key exists, fetch from AI
+  const apiKey = process.env.GEMINI_API_KEY || process.env.API_KEY;
+  if (apiKey) {
+    try {
+      const fresh = await fetchFreshQuestions(count, category, difficultyStart, mode);
+      const updatedCache = [...cachedQuestions, ...fresh];
+      const unique = Array.from(new Map(updatedCache.map(q => [q.text, q])).values());
+      setCache(cacheKey, unique);
+      return shuffleArray(unique).slice(0, count).map(randomizeOptions);
+    } catch (e) {
+      console.warn("AI fetch failed, using static pool");
+    }
+  }
 
-  return shuffleArray(unique).slice(0, count).map(randomizeOptions);
+  // 3. Last resort: just return whatever we have in the static bank
+  return shuffleArray(staticQuestions).slice(0, count).map(randomizeOptions);
 };
 
 export const researchTopic = async (topic: string, context: string): Promise<string> => {
@@ -158,15 +162,8 @@ const fetchFreshQuestions = async (
 ): Promise<Question[]> => {
   const apiKey = process.env.GEMINI_API_KEY || process.env.API_KEY;
   if (!apiKey) {
-    console.warn("Gemini API key is not configured. Using filtered fallback questions.");
-    const filtered = FALLBACK_QUESTIONS.filter(q => 
-      !category || q.category.toLowerCase() === category.toLowerCase()
-    );
-    const pool = filtered.length > 0 ? filtered : FALLBACK_QUESTIONS;
-    return shuffleArray(pool).slice(0, count).map(q => ({
-      ...q,
-      category: category || q.category
-    }));
+    const staticQuestions = category ? (QUESTION_BANK[category] || []) : QUESTION_BANK['General Knowledge'];
+    return shuffleArray(staticQuestions).slice(0, count);
   }
   const ai = new GoogleGenAI({ apiKey });
   console.log(`[AI] Fetching ${count} questions for subject: ${category || "General Knowledge"} (Mode: ${mode || "Standard"})`);
@@ -251,15 +248,9 @@ const fetchFreshQuestions = async (
       console.error(`Attempt ${attempt + 1} failed:`, error);
       
       if (attempt === retries) {
-        console.error(`Failed to fetch questions after ${retries + 1} attempts. Using filtered fallbacks.`);
-        const filtered = FALLBACK_QUESTIONS.filter(q => 
-          !category || q.category.toLowerCase() === category.toLowerCase()
-        );
-        const pool = filtered.length > 0 ? filtered : FALLBACK_QUESTIONS;
-        return shuffleArray(pool).slice(0, count).map(q => ({
-          ...q,
-          category: category || q.category
-        }));
+        console.error(`Failed to fetch questions after ${retries + 1} attempts. Using static bank.`);
+        const staticQuestions = category ? (QUESTION_BANK[category] || []) : QUESTION_BANK['General Knowledge'];
+        return shuffleArray(staticQuestions).slice(0, count);
       }
       
       // Exponential backoff: 1s, 2s, 4s...
