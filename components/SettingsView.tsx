@@ -2,16 +2,27 @@
 import React from 'react';
 import { User } from '../types';
 import { ICONS } from '../constants';
+import { isAIActive } from '../services/geminiService';
 
 interface SettingsViewProps {
   user: User;
   onUpdateUser: (updates: Partial<User>) => void;
+  onLogout: () => void;
 }
 
-const SettingsView: React.FC<SettingsViewProps> = ({ user, onUpdateUser }) => {
+const SettingsView: React.FC<SettingsViewProps> = ({ user, onUpdateUser, onLogout }) => {
   return (
     <div className="min-h-screen bg-[#050b18] text-white p-6 pb-32">
-      <h1 className="text-3xl font-cinzel gold-text-gradient font-bold mb-8">SETTINGS</h1>
+      <div className="flex justify-between items-center mb-8">
+        <h1 className="text-3xl font-cinzel gold-text-gradient font-bold">SETTINGS</h1>
+        <button 
+          onClick={onLogout}
+          className="flex items-center gap-2 text-xs font-bold text-red-400 hover:text-red-300 transition-colors uppercase tracking-widest"
+        >
+          <ICONS.LogOut className="w-4 h-4" />
+          Sign Out
+        </button>
+      </div>
 
       <div className="space-y-6">
         <section className="glass-card p-6 rounded-2xl border border-yellow-500/10">
@@ -34,30 +45,43 @@ const SettingsView: React.FC<SettingsViewProps> = ({ user, onUpdateUser }) => {
             <div>
               <label className="block text-[10px] text-gray-500 uppercase font-bold mb-1">App Version</label>
               <div className="bg-slate-900/50 p-3 rounded-lg border border-slate-800 text-sm font-medium">
-                v1.1.0 (Static-First Engine)
+                v1.2.0 (AI-Powered Engine)
+              </div>
+            </div>
+            <div>
+              <label className="block text-[10px] text-gray-500 uppercase font-bold mb-1">AI Status</label>
+              <div className={`p-3 rounded-lg border text-sm font-bold flex items-center gap-2 ${isAIActive() ? 'bg-green-500/10 border-green-500/30 text-green-400' : 'bg-red-500/10 border-red-500/30 text-red-400'}`}>
+                <div className={`w-2 h-2 rounded-full ${isAIActive() ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`}></div>
+                {isAIActive() ? 'ACTIVE (Unlimited Questions Enabled)' : 'INACTIVE (Using Static Bank)'}
               </div>
             </div>
           </div>
         </section>
 
         <section className="glass-card p-6 rounded-2xl border border-yellow-500/10">
-          <h2 className="text-sm font-bold tracking-widest text-[#d4af37] uppercase mb-4">Question Pool</h2>
-          <p className="text-xs text-gray-500 mb-4">If you are seeing questions that don't match the subject, refresh the pool to fetch fresh ones from the AI.</p>
-          <button 
-            onClick={() => {
-              // Clear all keys starting with arkumen_q_cache_
-              Object.keys(localStorage).forEach(key => {
-                if (key.startsWith('arkumen_q_cache_')) {
-                  localStorage.removeItem(key);
-                }
-              });
-              alert('Question pool cleared. Fresh questions will be fetched on your next game.');
-              window.location.reload();
-            }}
-            className="w-full py-3 bg-yellow-500/10 text-[#d4af37] border border-yellow-500/30 rounded-xl font-bold hover:bg-yellow-500/20 transition-all"
-          >
-            REFRESH QUESTION POOL
-          </button>
+          <h2 className="text-sm font-bold tracking-widest text-[#d4af37] uppercase mb-4">AI Question Engine</h2>
+          <p className="text-xs text-gray-500 mb-4">
+            {isAIActive() 
+              ? "Your Gemini API key is linked! You have access to unlimited, fresh questions across all subjects." 
+              : "Link a Gemini API key in AI Studio Secrets to unlock unlimited AI-generated questions and advanced research."}
+          </p>
+          <div className="grid grid-cols-1 gap-3">
+            <button 
+              onClick={() => {
+                Object.keys(localStorage).forEach(key => {
+                  if (key.startsWith('arkumen_q_cache_')) {
+                    localStorage.removeItem(key);
+                  }
+                });
+                alert('Question pool cleared. Fresh AI questions will be generated on your next game.');
+                window.location.reload();
+              }}
+              className="w-full py-3 bg-yellow-500/10 text-[#d4af37] border border-yellow-500/30 rounded-xl font-bold hover:bg-yellow-500/20 transition-all flex items-center justify-center gap-2"
+            >
+              <ICONS.RefreshCw className="w-4 h-4" />
+              REGENERATE AI POOL
+            </button>
+          </div>
         </section>
 
         <section className="glass-card p-6 rounded-2xl border border-red-500/10">

@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { GameMode, GameState, Question, User, Category } from '../types';
-import { fetchQuestions, researchTopic } from '../services/geminiService';
+import { GameMode, GameState, Question, User, Category, Difficulty } from '../types';
+import { fetchQuestions, researchTopic, isAIActive } from '../services/geminiService';
 import { audioService } from '../services/audioService';
 import { ICONS, GOLD_COLOR, REVELATIONS_QUESTIONS, GAME_MODES } from '../constants';
 import Markdown from 'react-markdown';
@@ -9,12 +9,23 @@ import Markdown from 'react-markdown';
 interface GameViewProps {
   mode: GameMode;
   category?: Category;
+  difficulty: Difficulty;
   user: User;
   onGameEnd: (stats: { score: number; streak: number; won: boolean; grade: string; message: string }) => void;
   onExit: (stats?: { score: number; streak: number }) => void;
 }
 
-const GameView: React.FC<GameViewProps> = ({ mode, category, user, onGameEnd, onExit }) => {
+const GameView: React.FC<GameViewProps> = ({ mode, category, difficulty, user, onGameEnd, onExit }) => {
+  const getInitialTime = () => {
+    if (mode !== GameMode.TIMED) return undefined;
+    switch (difficulty) {
+      case Difficulty.EASY: return 120;
+      case Difficulty.MEDIUM: return 90;
+      case Difficulty.HARD: return 60;
+      default: return 120;
+    }
+  };
+
   const [state, setState] = useState<GameState>({
     currentQuestionIndex: 0,
     score: 0,
@@ -22,7 +33,7 @@ const GameView: React.FC<GameViewProps> = ({ mode, category, user, onGameEnd, on
     incorrectCount: 0,
     isGameOver: false,
     isWon: false,
-    timeLeft: mode === GameMode.TIMED ? 120 : undefined,
+    timeLeft: getInitialTime(),
     questions: [],
     streak: 0,
     maxStreak: 0,
@@ -54,7 +65,7 @@ const GameView: React.FC<GameViewProps> = ({ mode, category, user, onGameEnd, on
       if (mode === GameMode.UME) count = 100;
       if (mode === GameMode.SSCE) count = 70;
       
-      const qs = await fetchQuestions(count, category, 1, mode);
+      const qs = await fetchQuestions(count, category, difficulty, mode);
       if (qs.length === 0) throw new Error("No questions were generated. Please try again.");
       
       setState(prev => ({ ...prev, questions: qs }));
@@ -150,8 +161,18 @@ const GameView: React.FC<GameViewProps> = ({ mode, category, user, onGameEnd, on
       audioService.playWrong();
     }
 
+    const getPoints = () => {
+      switch (difficulty) {
+        case Difficulty.EASY: return 3;
+        case Difficulty.MEDIUM: return 5;
+        case Difficulty.HARD: return 8;
+        default: return 3;
+      }
+    };
+
     setState(prev => {
       const newStreak = isCorrect ? prev.streak + 1 : 0;
+      const points = getPoints();
       return {
         ...prev,
         selectedOption: index,
@@ -160,7 +181,7 @@ const GameView: React.FC<GameViewProps> = ({ mode, category, user, onGameEnd, on
         maxStreak: Math.max(prev.maxStreak, newStreak),
         correctCount: isCorrect ? prev.correctCount + 1 : prev.correctCount,
         incorrectCount: !isCorrect ? prev.incorrectCount + 1 : prev.incorrectCount,
-        score: isCorrect ? prev.score + 3 : prev.score
+        score: isCorrect ? prev.score + points : prev.score
       };
     });
 
@@ -193,11 +214,44 @@ const GameView: React.FC<GameViewProps> = ({ mode, category, user, onGameEnd, on
     }
   };
 
+  const [loadingTip, setLoadingTip] = useState("Preparing the arena...");
+  const tips = [
+    "Did you know? The word 'Quiz' was supposedly coined in 1791.",
+    "The AI is currently researching the most challenging questions for you.",
+    "Arkumen tests not just knowledge, but speed and precision.",
+    "Every correct answer adds to your legacy in the leaderboard.",
+    "The 'Hard' difficulty is designed for true masters of the subject.",
+    "Stay focused. The arena rewards the disciplined mind.",
+    "Researching topics after a game is the best way to grow your knowledge."
+  ];
+
+  useEffect(() => {
+    if (isLoading) {
+      const interval = setInterval(() => {
+        setLoadingTip(tips[Math.floor(Math.random() * tips.length)]);
+      }, 3000);
+      return () => clearInterval(interval);
+    }
+  }, [isLoading]);
+
   if (isLoading) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-[#050b18]">
-        <div className="w-16 h-16 border-4 border-[#d4af37]/20 border-t-[#d4af37] rounded-full animate-spin mb-4"></div>
-        <p className="text-[#d4af37] font-cinzel tracking-widest animate-pulse">PREPARING ARENA...</p>
+      <div className="min-h-screen flex flex-col items-center justify-center bg-[#050b18] p-6">
+        <div className="relative mb-12">
+          <div className="w-24 h-24 border-4 border-[#d4af37]/10 border-t-[#d4af37] rounded-full animate-spin"></div>
+          <div className="absolute inset-0 flex items-center justify-center">
+            <ICONS.Trophy className="w-8 h-8 text-[#d4af37] animate-pulse" />
+          </div>
+        </div>
+        <div className="text-center max-w-xs animate-in fade-in slide-in-from-bottom-4 duration-700">
+          <h2 className="text-xl font-cinzel gold-text-gradient font-bold mb-2 tracking-widest">PREPARING ARENA</h2>
+          <div className="h-1 w-full bg-slate-800 rounded-full overflow-hidden mb-6">
+            <div className="h-full bg-[#d4af37] animate-progress-fast"></div>
+          </div>
+          <p className="text-gray-400 text-sm italic font-medium leading-relaxed min-h-[3rem]">
+            {loadingTip}
+          </p>
+        </div>
       </div>
     );
   }
@@ -259,6 +313,12 @@ const GameView: React.FC<GameViewProps> = ({ mode, category, user, onGameEnd, on
               <ICONS.Award className="w-4 h-4 text-[#d4af37]" />
               <span className="font-cinzel text-xl gold-text-gradient">{state.score.toLocaleString()}</span>
             </div>
+            {isAIActive() && (
+              <div className="flex items-center gap-1 px-1.5 py-0.5 bg-green-500/10 border border-green-500/30 rounded text-[8px] font-bold text-green-400 uppercase tracking-tighter">
+                <div className="w-1 h-1 rounded-full bg-green-500 animate-pulse"></div>
+                AI
+              </div>
+            )}
           </div>
         </div>
         <div className="w-10">
@@ -374,7 +434,7 @@ const GameView: React.FC<GameViewProps> = ({ mode, category, user, onGameEnd, on
                   </div>
                 )}
               </div>
-              <h1 className={`text-4xl font-cinzel font-bold mb-2 ${feedback.color === 'text-green-400' ? 'gold-text-gradient' : feedback.color}`}>
+              <h1 className={`text-3xl px-4 font-cinzel font-bold mb-2 ${feedback.color === 'text-green-400' ? 'gold-text-gradient' : feedback.color}`}>
                 {feedback.title}
               </h1>
               <p className={`${feedback.color} mb-8 uppercase tracking-[0.3em] text-xs font-bold`}>

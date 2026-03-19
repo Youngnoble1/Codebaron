@@ -17,6 +17,7 @@ import {
   AlertCircle,
   GraduationCap,
   LogOut,
+  LogIn,
   Camera,
   Upload,
   Users,
@@ -25,7 +26,8 @@ import {
   EyeOff,
   Search,
   Download,
-  Library
+  Library,
+  RefreshCw
 } from 'lucide-react';
 import { Category, GameMode } from './types';
 
@@ -176,6 +178,7 @@ export const ICONS = {
   CheckCircle2,
   AlertCircle,
   LogOut,
+  LogIn,
   Camera,
   Upload,
   Users,
@@ -184,7 +187,8 @@ export const ICONS = {
   EyeOff,
   Search,
   Download,
-  Library
+  Library,
+  RefreshCw
 };
 
 export const REVELATIONS_QUESTIONS = [

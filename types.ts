@@ -14,6 +14,12 @@ export enum GameMode {
   REVELATIONS = 'REVELATIONS'
 }
 
+export enum Difficulty {
+  EASY = 'EASY',
+  MEDIUM = 'MEDIUM',
+  HARD = 'HARD'
+}
+
 export type Category = 
   | 'Mathematics'
   | 'English'

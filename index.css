@@ -16,6 +16,15 @@ body {
   font-family: var(--font-sans);
 }
 
+@keyframes progress-fast {
+  0% { width: 0%; }
+  100% { width: 100%; }
+}
+
+.animate-progress-fast {
+  animation: progress-fast 10s linear infinite;
+}
+
 .font-cinzel {
   font-family: var(--font-serif);
 }

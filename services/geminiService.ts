@@ -1,6 +1,6 @@
 
-import { GoogleGenAI, Type } from "@google/genai";
-import { Question, Category } from "../types";
+import { GoogleGenAI, Type, ThinkingLevel } from "@google/genai";
+import { Question, Category, Difficulty } from "../types";
 import { QUESTION_BANK } from "./questionBank";
 
 const QUESTION_SCHEMA = {
@@ -66,14 +66,26 @@ const setCache = (key: string, questions: Question[]) => {
 export const fetchQuestions = async (
   count: number,
   category?: Category,
-  difficultyStart: number = 1,
+  difficulty: Difficulty = Difficulty.EASY,
   mode?: string
 ): Promise<Question[]> => {
-  const cacheKey = mode && category ? `${mode}_${category}` : (mode || category || 'General Knowledge');
+  const cacheKey = mode && category ? `${mode}_${category}_${difficulty}` : (mode ? `${mode}_${difficulty}` : (category ? `${category}_${difficulty}` : `General Knowledge_${difficulty}`));
   const cachedQuestions = getCache(cacheKey);
 
+  const diffMap: Record<Difficulty, number> = {
+    [Difficulty.EASY]: 1,
+    [Difficulty.MEDIUM]: 2,
+    [Difficulty.HARD]: 3
+  };
+  const diffValue = diffMap[difficulty];
+
   // 1. Check local static bank first (Guaranteed subject accuracy)
-  const staticQuestions = category ? (QUESTION_BANK[category] || []) : QUESTION_BANK['General Knowledge'];
+  let staticQuestions = (category ? (QUESTION_BANK[category] || []) : QUESTION_BANK['General Knowledge'])
+    .filter(q => q.difficulty === diffValue);
+  
+  if (staticQuestions.length === 0) {
+    staticQuestions = category ? (QUESTION_BANK[category] || []) : QUESTION_BANK['General Knowledge'];
+  }
   
   // If we have enough in cache or static bank, use them
   const pool = [...cachedQuestions, ...staticQuestions];
@@ -85,13 +97,19 @@ export const fetchQuestions = async (
     // Background fetch fresh ones to keep the pool updated if API key exists
     const apiKey = process.env.GEMINI_API_KEY || process.env.API_KEY;
     if (apiKey) {
-      fetchFreshQuestions(5, category, difficultyStart, mode)
-        .then(fresh => {
-          const updatedCache = [...cachedQuestions, ...fresh];
-          const unique = Array.from(new Map(updatedCache.map(q => [q.text, q])).values());
-          setCache(cacheKey, unique);
-        })
-        .catch(() => {});
+      // Only fetch if cache is low (less than 30 questions)
+      if (cachedQuestions.length < 30) {
+        // Delay background fetch to avoid burst
+        setTimeout(() => {
+          fetchFreshQuestions(10, category, difficulty, mode)
+            .then(fresh => {
+              const updatedCache = [...cachedQuestions, ...fresh];
+              const unique = Array.from(new Map(updatedCache.map(q => [q.text, q])).values());
+              setCache(cacheKey, unique);
+            })
+            .catch(() => {});
+        }, 5000);
+      }
     }
 
     return selected.map(randomizeOptions);
@@ -101,11 +119,17 @@ export const fetchQuestions = async (
   const apiKey = process.env.GEMINI_API_KEY || process.env.API_KEY;
   if (apiKey) {
     try {
-      const fresh = await fetchFreshQuestions(count, category, difficultyStart, mode);
+      const fetchCount = Math.max(count, 15);
+      const fresh = await fetchFreshQuestions(fetchCount, category, difficulty, mode);
+      
       const updatedCache = [...cachedQuestions, ...fresh];
       const unique = Array.from(new Map(updatedCache.map(q => [q.text, q])).values());
       setCache(cacheKey, unique);
-      return shuffleArray(unique).slice(0, count).map(randomizeOptions);
+      
+      const finalPool = uniquePool.length > 0 ? unique : fresh;
+      const resultCount = Math.min(finalPool.length, count);
+      
+      return shuffleArray(finalPool).slice(0, resultCount).map(randomizeOptions);
     } catch (e) {
       console.warn("AI fetch failed, using static pool");
     }
@@ -139,24 +163,36 @@ export const researchTopic = async (topic: string, context: string): Promise<str
   }
 };
 
+export const isAIActive = (): boolean => {
+  return !!(process.env.GEMINI_API_KEY || process.env.API_KEY);
+};
+
 export const prewarmCache = async (categories: string[]) => {
-  // Fetch 10 questions for each category in background
+  // Fetch questions for each category sequentially with a delay to avoid rate limits
   for (const cat of categories) {
-    fetchFreshQuestions(10, cat as Category)
-      .then(fresh => {
-        const cached = getCache(cat);
-        const updated = [...cached, ...fresh];
-        const unique = Array.from(new Map(updated.map(q => [q.text, q])).values());
-        setCache(cat, unique);
-      })
-      .catch(() => {});
+    try {
+      // Check if we already have enough in cache
+      const cacheKey = `${cat}_${Difficulty.EASY}`;
+      const cached = getCache(cacheKey);
+      if (cached.length >= 15) continue;
+
+      const fresh = await fetchFreshQuestions(15, cat as Category, Difficulty.EASY);
+      const updated = [...cached, ...fresh];
+      const unique = Array.from(new Map(updated.map(q => [q.text, q])).values());
+      setCache(cacheKey, unique);
+      
+      // Wait 3 seconds between categories to be safe with RPM limits
+      await new Promise(resolve => setTimeout(resolve, 3000));
+    } catch (e) {
+      // Ignore errors in background pre-warming
+    }
   }
 };
 
 const fetchFreshQuestions = async (
   count: number,
   category?: Category,
-  difficultyStart: number = 1,
+  difficulty: Difficulty = Difficulty.EASY,
   mode?: string,
   retries: number = 3
 ): Promise<Question[]> => {
@@ -166,7 +202,7 @@ const fetchFreshQuestions = async (
     return shuffleArray(staticQuestions).slice(0, count);
   }
   const ai = new GoogleGenAI({ apiKey });
-  console.log(`[AI] Fetching ${count} questions for subject: ${category || "General Knowledge"} (Mode: ${mode || "Standard"})`);
+  console.log(`[AI] Fetching ${count} ${difficulty} questions for subject: ${category || "General Knowledge"} (Mode: ${mode || "Standard"})`);
 
   const academicSubjects = [
     'Mathematics', 'English', 'Physics', 'Chemistry', 'Biology', 'Geography', 
@@ -197,27 +233,22 @@ const fetchFreshQuestions = async (
     context = `Category: ${category || "General Knowledge"}. Focus on high-stakes Millionaire-style general trivia.`;
   }
 
-  const prompt = `Generate ${count} unique, high-quality trivia questions for a game called Arkumen.
-  Target Audience: High School students (JSS1 - SS3 context) for school subjects, or general adults for trivia.
-  
+  const difficultyPrompt = {
+    [Difficulty.EASY]: "EASY: Common knowledge, very simple concepts that most people know. Straightforward questions.",
+    [Difficulty.MEDIUM]: "MEDIUM: Specific knowledge, requires some study or familiarity with the subject. More detailed concepts.",
+    [Difficulty.HARD]: "HARD: Quite challenging and obscure, requires deep expertise or specialized knowledge. Complex or rare facts."
+  }[difficulty];
+
+  const prompt = `Generate ${count} unique, high-quality ${category || "General Knowledge"} trivia questions for Arkumen.
   Context: ${context}
+  Difficulty: ${difficultyPrompt}
   
-  CRITICAL SUBJECT LOCK: 
-  Every single question in this batch MUST be strictly and exclusively about the subject: "${category || "General Knowledge"}". 
-  
-  STRICT PROHIBITION:
-  - If the subject is Mathematics, do NOT include Physics or Chemistry questions.
-  - If the subject is Biology, do NOT include Geography questions.
-  - Do NOT include general knowledge if a specific subject is requested.
-  - Every question must be a core topic within "${category || "General Knowledge"}".
-  
-  Difficulty level: starting at ${difficultyStart}/36.
-  Questions must be accurate, engaging, and have 4 clear options.
-  
-  To ensure variety and reduce repetition, use the following random seed for this session: ${Date.now()}_${Math.random()}.
-  Generate completely different questions from any previous sessions.
-  
-  Output the response as a JSON array of question objects.`;
+  Requirements:
+  - Subject: Strictly "${category || "General Knowledge"}".
+  - Format: JSON array of objects with {text, options, correctAnswer, explanation}.
+  - Options: Exactly 4 strings.
+  - CorrectAnswer: Index 0-3.
+  - Seed: ${Date.now()}_${Math.random()}.`;
 
   for (let attempt = 0; attempt <= retries; attempt++) {
     try {
@@ -230,7 +261,7 @@ const fetchFreshQuestions = async (
             type: Type.ARRAY,
             items: QUESTION_SCHEMA
           },
-          tools: [{ googleSearch: {} }]
+          thinkingConfig: { thinkingLevel: ThinkingLevel.LOW }
         }
       });
 
@@ -238,13 +269,15 @@ const fetchFreshQuestions = async (
       if (!text) throw new Error("Empty response from AI");
       const rawQuestions = JSON.parse(text);
       
-      return rawQuestions.map((q: any, index: number) => ({
+      return rawQuestions.map((q: any) => ({
         ...q,
         id: Math.random().toString(36).substr(2, 9),
-        difficulty: difficultyStart + index,
+        difficulty: difficulty === Difficulty.EASY ? 1 : (difficulty === Difficulty.MEDIUM ? 2 : 3),
         category: category || (mode as Category) || "General Knowledge"
       }));
     } catch (error: any) {
+      const isQuotaError = error?.message?.includes("RESOURCE_EXHAUSTED") || error?.status === "RESOURCE_EXHAUSTED" || error?.code === 429;
+      
       console.error(`Attempt ${attempt + 1} failed:`, error);
       
       if (attempt === retries) {
@@ -253,13 +286,18 @@ const fetchFreshQuestions = async (
         return shuffleArray(staticQuestions).slice(0, count);
       }
       
-      // Exponential backoff: 1s, 2s, 4s...
-      const delay = Math.pow(2, attempt) * 1000;
+      // Longer backoff for quota errors
+      const delay = isQuotaError 
+        ? (Math.pow(2, attempt) * 5000) + (Math.random() * 2000) // 5s, 10s, 20s...
+        : (Math.pow(2, attempt) * 1000); // 1s, 2s, 4s...
+        
       await new Promise(resolve => setTimeout(resolve, delay));
     }
   }
   
-  return []; // Should not reach here due to throw
+  // Fallback if loop finishes without returning (shouldn't happen)
+  const staticQuestions = category ? (QUESTION_BANK[category] || []) : QUESTION_BANK['General Knowledge'];
+  return shuffleArray(staticQuestions).slice(0, count);
 };
 
 const randomizeOptions = (q: Question): Question => {

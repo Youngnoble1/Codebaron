@@ -1,10 +1,11 @@
 
 import React, { useState, useEffect } from 'react';
-import { db } from './firebase';
+import { db, auth, googleProvider, signInWithPopup } from './firebase';
+import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
-import { User, GameMode, Category } from './types';
+import { User, GameMode, Category, Difficulty } from './types';
 import { GAME_MODES, TRIVIA_CATEGORIES, ACADEMIC_SUBJECTS, JSSCE_SUBJECTS, ICONS } from './constants';
-import { prewarmCache } from './services/geminiService';
+import { prewarmCache, isAIActive } from './services/geminiService';
 import Navigation from './components/Navigation';
 import GameView from './components/GameView';
 import ProfileView from './components/ProfileView';
@@ -13,8 +14,6 @@ import LeaderboardView from './components/LeaderboardView';
 import MultiplayerView from './components/MultiplayerView';
 import LibraryView from './components/LibraryView';
 import ErrorBoundary from './components/ErrorBoundary';
-
-const GUEST_ID_KEY = 'arkumen_guest_id';
 
 enum OperationType {
   CREATE = 'create',
@@ -48,12 +47,17 @@ const handleFirestoreError = (error: unknown, operationType: OperationType, path
   const errInfo: FirestoreErrorInfo = {
     error: error instanceof Error ? error.message : String(error),
     authInfo: {
-      userId: localStorage.getItem(GUEST_ID_KEY) || 'unknown',
-      email: undefined,
-      emailVerified: undefined,
-      isAnonymous: true,
-      tenantId: undefined,
-      providerInfo: []
+      userId: auth.currentUser?.uid || 'unknown',
+      email: auth.currentUser?.email,
+      emailVerified: auth.currentUser?.emailVerified,
+      isAnonymous: auth.currentUser?.isAnonymous,
+      tenantId: auth.currentUser?.tenantId,
+      providerInfo: auth.currentUser?.providerData.map(provider => ({
+        providerId: provider.providerId,
+        displayName: provider.displayName,
+        email: provider.email,
+        photoUrl: provider.photoURL
+      })) || []
     },
     operationType,
     path
@@ -62,20 +66,12 @@ const handleFirestoreError = (error: unknown, operationType: OperationType, path
   throw new Error(JSON.stringify(errInfo));
 };
 
-const getPersistentId = () => {
-  let id = localStorage.getItem(GUEST_ID_KEY);
-  if (!id) {
-    id = 'warrior_' + Math.random().toString(36).substr(2, 9) + Date.now().toString(36).substr(-4);
-    localStorage.setItem(GUEST_ID_KEY, id);
-  }
-  return id;
-};
-
 const App: React.FC = () => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('home');
-  const [currentGame, setCurrentGame] = useState<{ mode: GameMode; category?: Category } | null>(null);
+  const [difficulty, setDifficulty] = useState<Difficulty>(Difficulty.EASY);
+  const [currentGame, setCurrentGame] = useState<{ mode: GameMode; category?: Category; difficulty: Difficulty } | null>(null);
   const [showAcademicMenu, setShowAcademicMenu] = useState(false);
   const [showUMEMenu, setShowUMEMenu] = useState(false);
   const [showSSCEMenu, setShowSSCEMenu] = useState(false);
@@ -91,78 +87,94 @@ const App: React.FC = () => {
   // Initialize Guest User
   useEffect(() => {
     // Pre-warm cache for common categories immediately
-    prewarmCache(['General Knowledge', 'Science & Nature']);
+    prewarmCache(['General Knowledge', 'Science & Nature', 'History', 'Geography', 'Mathematics', 'Physics', 'Chemistry', 'Biology']);
 
-    const initUser = async () => {
-      try {
-        console.log("Initializing warrior session...");
-        
-        const userId = getPersistentId();
-        console.log("Using persistent ID:", userId);
-
-        const userDocRef = doc(db, 'users', userId);
-        let userDocSnap;
-        try {
-          userDocSnap = await getDoc(userDocRef);
-        } catch (error) {
-          console.error("Failed to fetch user document:", error);
-          handleFirestoreError(error, OperationType.GET, `users/${userId}`);
-        }
-
-        if (userDocSnap && userDocSnap.exists()) {
-          console.log("Existing warrior profile found.");
-          setUser(userDocSnap.data() as User);
-        } else {
-          console.log("Creating new warrior profile...");
-          // Create new guest profile
-          const newUser: User = {
-            id: userId,
-            username: `Warrior_${userId.substr(-4)}`,
-            email: '',
-            royaltyPoints: 0,
-            highestScore: 0,
-            longestStreak: 0,
-            favoriteCategory: 'General Knowledge',
-            avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${userId}`,
-            playCount: {},
-            role: 'player',
-            createdAt: new Date().toISOString()
-          };
-
-          try {
-            await setDoc(userDocRef, newUser);
-            console.log("Warrior profile created successfully.");
-          } catch (error) {
-            console.error("Failed to create user document:", error);
-            handleFirestoreError(error, OperationType.WRITE, `users/${userId}`);
-          }
-
-          // Initialize leaderboard entry too
-          try {
-            await setDoc(doc(db, 'leaderboard', userId), {
-              id: userId,
-              username: newUser.username,
-              royaltyPoints: newUser.royaltyPoints,
-              highestScore: newUser.highestScore,
-              avatar: newUser.avatar
-            });
-            console.log("Leaderboard entry initialized.");
-          } catch (error) {
-            console.error("Failed to initialize leaderboard entry:", error);
-            handleFirestoreError(error, OperationType.WRITE, `leaderboard/${userId}`);
-          }
-          
-          setUser(newUser);
-        }
-      } catch (error: any) {
-        console.error("CRITICAL: Error initializing guest user", error);
-      } finally {
+    const unsubscribe = onAuthStateChanged(auth, async (authUser) => {
+      if (!authUser) {
+        setUser(null);
         setLoading(false);
+        return;
       }
-    };
 
-    initUser();
+      const userId = authUser.uid;
+      console.log("Using Firebase Auth UID:", userId);
+
+      const userDocRef = doc(db, 'users', userId);
+      let userDocSnap;
+      try {
+        userDocSnap = await getDoc(userDocRef);
+      } catch (error) {
+        console.error("Failed to fetch user document:", error);
+        handleFirestoreError(error, OperationType.GET, `users/${userId}`);
+      }
+
+      if (userDocSnap && userDocSnap.exists()) {
+        console.log("Existing warrior profile found.");
+        setUser(userDocSnap.data() as User);
+      } else {
+        console.log("Creating new warrior profile...");
+        // Create new guest profile
+        const newUser: User = {
+          id: userId,
+          username: `Warrior_${userId.substr(-4)}`,
+          email: '',
+          royaltyPoints: 0,
+          highestScore: 0,
+          longestStreak: 0,
+          favoriteCategory: 'General Knowledge',
+          avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${userId}`,
+          playCount: {},
+          role: 'player',
+          createdAt: new Date().toISOString()
+        };
+
+        try {
+          await setDoc(userDocRef, newUser);
+          console.log("Warrior profile created successfully.");
+        } catch (error) {
+          console.error("Failed to create user document:", error);
+          handleFirestoreError(error, OperationType.WRITE, `users/${userId}`);
+        }
+
+        // Initialize leaderboard entry too
+        try {
+          await setDoc(doc(db, 'leaderboard', userId), {
+            id: userId,
+            username: newUser.username,
+            royaltyPoints: newUser.royaltyPoints,
+            highestScore: newUser.highestScore,
+            avatar: newUser.avatar
+          });
+          console.log("Leaderboard entry initialized.");
+        } catch (error) {
+          console.error("Failed to initialize leaderboard entry:", error);
+          handleFirestoreError(error, OperationType.WRITE, `leaderboard/${userId}`);
+        }
+        
+        setUser(newUser);
+      }
+      setLoading(false);
+    });
+
+    return () => unsubscribe();
   }, []);
+
+  const handleLogin = async () => {
+    try {
+      await signInWithPopup(auth, googleProvider);
+    } catch (error) {
+      console.error("Login failed:", error);
+    }
+  };
+
+  const handleLogout = async () => {
+    try {
+      await signOut(auth);
+      setUser(null);
+    } catch (error) {
+      console.error("Logout failed:", error);
+    }
+  };
 
   const handleUpdateUser = async (updates: Partial<User>) => {
     if (!user) return;
@@ -247,23 +259,40 @@ const App: React.FC = () => {
 
   if (!user) {
     return (
-      <div className="min-h-screen bg-[#050b18] flex flex-col items-center justify-center p-6 text-center">
-        <div className="w-16 h-16 bg-red-500/10 rounded-full flex items-center justify-center mb-6">
-          <ICONS.EyeOff className="text-red-500 w-8 h-8" />
+      <div className="min-h-screen bg-[#050b18] flex flex-col items-center justify-center p-8 text-center relative overflow-hidden">
+        {/* Background Accents */}
+        <div className="absolute -top-24 -left-24 w-64 h-64 bg-[#d4af37]/10 rounded-full blur-[100px]"></div>
+        <div className="absolute -bottom-24 -right-24 w-64 h-64 bg-blue-500/10 rounded-full blur-[100px]"></div>
+        
+        <div className="relative z-10 max-w-sm w-full">
+          <div className="mb-12 animate-in zoom-in duration-1000">
+            <div className="w-24 h-24 bg-slate-900 rounded-3xl border-2 border-[#d4af37] flex items-center justify-center mx-auto mb-6 shadow-2xl shadow-yellow-500/20 rotate-12">
+              <ICONS.Trophy className="w-12 h-12 text-[#d4af37]" />
+            </div>
+            <h1 className="text-5xl font-cinzel gold-text-gradient font-black tracking-tighter mb-2">ARKUMEN</h1>
+            <p className="text-gray-500 text-xs tracking-[0.4em] font-bold uppercase">the elite quiz arena</p>
+          </div>
+
+          <div className="glass-card p-8 rounded-3xl border border-[#d4af37]/20 mb-8 animate-in slide-in-from-bottom-8 duration-700">
+            <h2 className="text-xl font-cinzel text-white font-bold mb-4">WELCOME WARRIOR</h2>
+            <p className="text-gray-400 text-sm mb-8 leading-relaxed">
+              Step into the arena where knowledge is power. Sign in to track your legacy, climb the leaderboard, and unlock the AI engine.
+            </p>
+            
+            <button 
+              onClick={handleLogin}
+              className="w-full py-4 gold-gradient text-slate-900 font-bold rounded-xl shadow-xl hover:scale-105 transition-all transform active:scale-95 flex items-center justify-center gap-3"
+            >
+              <ICONS.LogIn className="w-5 h-5" />
+              ENTER THE ARENA
+            </button>
+          </div>
+
+          <p className="text-[10px] text-gray-600 uppercase tracking-widest leading-relaxed">
+            By entering, you agree to the terms of the arena.<br/>
+            Powered by Gemini AI Engine
+          </p>
         </div>
-        <h1 className="text-2xl font-cinzel text-white mb-2">ARENA CONNECTION FAILED</h1>
-        <p className="text-gray-400 text-sm mb-8 max-w-xs">
-          We couldn't initialize your warrior profile. This might be due to a connection issue, unauthorized domain, or server maintenance.
-        </p>
-        <button 
-          onClick={() => window.location.reload()}
-          className="px-8 py-3 gold-gradient text-slate-900 font-bold rounded-xl shadow-xl hover:scale-105 transition-all transform active:scale-95"
-        >
-          RETRY CONNECTION
-        </button>
-        <p className="mt-6 text-[10px] text-gray-600 uppercase tracking-widest">
-          Check browser console for detailed error logs
-        </p>
       </div>
     );
   }
@@ -281,6 +310,7 @@ const App: React.FC = () => {
       <GameView 
         mode={currentGame.mode} 
         category={currentGame.category} 
+        difficulty={currentGame.difficulty}
         user={user}
         onGameEnd={handleGameEnd}
         onExit={(stats) => {
@@ -304,14 +334,22 @@ const App: React.FC = () => {
       case 'profile':
         return <ProfileView user={user} onUpdateUser={handleUpdateUser} />;
       case 'settings':
-        return <SettingsView user={user} onUpdateUser={handleUpdateUser} />;
+        return <SettingsView user={user} onUpdateUser={handleUpdateUser} onLogout={handleLogout} />;
       default:
         return (
           <div className="p-6 pb-32 animate-in fade-in duration-500">
             <header className="flex justify-between items-center mb-10">
               <div>
-                <h1 className="text-3xl font-cinzel gold-text-gradient font-bold">ARKUMEN</h1>
-                <p className="text-gray-400 text-xs tracking-[0.2em] font-bold uppercase">the the elite quiz arena</p>
+                <div className="flex items-center gap-2 mb-1">
+                  <h1 className="text-3xl font-cinzel gold-text-gradient font-bold leading-none">ARKUMEN</h1>
+                  {isAIActive() && (
+                    <div className="flex items-center gap-1 px-1.5 py-0.5 bg-green-500/10 border border-green-500/30 rounded text-[8px] font-bold text-green-400 uppercase tracking-tighter animate-in fade-in zoom-in duration-500">
+                      <div className="w-1 h-1 rounded-full bg-green-500 animate-pulse"></div>
+                      AI Active
+                    </div>
+                  )}
+                </div>
+                <p className="text-gray-400 text-xs tracking-[0.2em] font-bold uppercase">the elite quiz arena</p>
               </div>
               <div 
                 onClick={() => setActiveTab('profile')}
@@ -322,7 +360,24 @@ const App: React.FC = () => {
             </header>
 
             <div className="mb-8">
-              <h2 className="text-sm font-bold tracking-widest text-[#d4af37] uppercase mb-4">Core Challenges</h2>
+              <div className="flex justify-between items-end mb-4">
+                <h2 className="text-sm font-bold tracking-widest text-[#d4af37] uppercase">Core Challenges</h2>
+                <div className="flex bg-slate-900/80 rounded-lg p-1 border border-slate-800">
+                  {[Difficulty.EASY, Difficulty.MEDIUM, Difficulty.HARD].map((d) => (
+                    <button
+                      key={d}
+                      onClick={() => setDifficulty(d)}
+                      className={`px-3 py-1 text-[10px] font-bold rounded-md transition-all ${
+                        difficulty === d 
+                          ? 'bg-[#d4af37] text-slate-900 shadow-lg' 
+                          : 'text-gray-500 hover:text-gray-300'
+                      }`}
+                    >
+                      {d}
+                    </button>
+                  ))}
+                </div>
+              </div>
               <div className="grid grid-cols-1 gap-4">
                 {GAME_MODES.slice(0, 4).map((mode) => (
                   <button
@@ -337,7 +392,7 @@ const App: React.FC = () => {
                         setShowNECOMenu(false);
                         setShowJSSCEMenu(false);
                       } else {
-                        setCurrentGame({ mode: mode.id, category: 'General Knowledge' });
+                        setCurrentGame({ mode: mode.id, category: 'General Knowledge', difficulty });
                       }
                     }}
                     className={`group relative overflow-hidden glass-card p-6 rounded-2xl border border-yellow-500/10 flex items-center gap-6 transition-all duration-300 hover:border-[#d4af37]/50 hover:bg-slate-800/50 active:scale-[0.98] ${showSpecialistMenu && mode.id === GameMode.CATEGORY ? 'border-[#d4af37]/50 bg-slate-800/50' : ''}`}
@@ -354,7 +409,7 @@ const App: React.FC = () => {
                 
                 {/* Multiplayer Button */}
                 <button
-                  onClick={() => setCurrentGame({ mode: GameMode.MULTIPLAYER })}
+                  onClick={() => setCurrentGame({ mode: GameMode.MULTIPLAYER, difficulty })}
                   className="group relative overflow-hidden glass-card p-6 rounded-2xl border border-pink-500/30 flex items-center gap-6 transition-all duration-300 hover:border-pink-400/50 hover:bg-slate-800/50 active:scale-[0.98]"
                 >
                   <div className="p-4 bg-slate-900 rounded-xl group-hover:scale-110 transition-transform border border-slate-800">
@@ -381,7 +436,7 @@ const App: React.FC = () => {
                   {TRIVIA_CATEGORIES.map(cat => (
                     <button 
                       key={cat}
-                      onClick={() => setCurrentGame({ mode: GameMode.CATEGORY, category: cat })}
+                      onClick={() => setCurrentGame({ mode: GameMode.CATEGORY, category: cat, difficulty })}
                       className="p-3 text-xs font-bold text-white bg-slate-800 rounded-lg hover:bg-[#d4af37] hover:text-[#050b18] transition-all truncate border border-slate-700 hover:border-[#d4af37]"
                     >
                       {cat}
@@ -420,7 +475,7 @@ const App: React.FC = () => {
                 {ACADEMIC_SUBJECTS.map((cat) => (
                   <button
                     key={cat}
-                    onClick={() => setCurrentGame({ mode: GameMode.ACADEMIC, category: cat })}
+                    onClick={() => setCurrentGame({ mode: GameMode.ACADEMIC, category: cat, difficulty })}
                     className="glass-card p-4 rounded-xl text-left border border-slate-800 hover:border-purple-500/50 transition-all active:scale-[0.98]"
                   >
                     <div className="text-[10px] text-gray-400 font-bold uppercase mb-1 truncate">{cat}</div>
@@ -434,7 +489,7 @@ const App: React.FC = () => {
               <h2 className="text-sm font-bold tracking-widest text-[#d4af37] uppercase mb-4">Divine Revelations</h2>
               <button
                 onClick={() => {
-                  setCurrentGame({ mode: GameMode.REVELATIONS, category: 'Revelations' });
+                  setCurrentGame({ mode: GameMode.REVELATIONS, category: 'Revelations', difficulty });
                 }}
                 className="group w-full relative overflow-hidden glass-card p-6 rounded-2xl border border-amber-500/30 flex items-center gap-6 transition-all duration-300 hover:border-amber-400/50 hover:bg-slate-800/50 active:scale-[0.98]"
               >
@@ -482,7 +537,7 @@ const App: React.FC = () => {
                     {ACADEMIC_SUBJECTS.map((cat) => (
                       <button
                         key={cat}
-                        onClick={() => setCurrentGame({ mode: GameMode.UME, category: cat })}
+                        onClick={() => setCurrentGame({ mode: GameMode.UME, category: cat, difficulty })}
                         className="glass-card p-4 rounded-xl text-left border border-slate-800 hover:border-blue-500/50 transition-all active:scale-[0.98]"
                       >
                         <div className="text-[10px] text-gray-400 font-bold uppercase mb-1 truncate">{cat}</div>
@@ -520,7 +575,7 @@ const App: React.FC = () => {
                     {ACADEMIC_SUBJECTS.map((cat) => (
                       <button
                         key={cat}
-                        onClick={() => setCurrentGame({ mode: GameMode.SSCE, category: cat })}
+                        onClick={() => setCurrentGame({ mode: GameMode.SSCE, category: cat, difficulty })}
                         className="glass-card p-4 rounded-xl text-left border border-slate-800 hover:border-orange-500/50 transition-all active:scale-[0.98]"
                       >
                         <div className="text-[10px] text-gray-400 font-bold uppercase mb-1 truncate">{cat}</div>
@@ -558,7 +613,7 @@ const App: React.FC = () => {
                     {ACADEMIC_SUBJECTS.map((cat) => (
                       <button
                         key={cat}
-                        onClick={() => setCurrentGame({ mode: GameMode.GCE, category: cat })}
+                        onClick={() => setCurrentGame({ mode: GameMode.GCE, category: cat, difficulty })}
                         className="glass-card p-4 rounded-xl text-left border border-slate-800 hover:border-indigo-500/50 transition-all active:scale-[0.98]"
                       >
                         <div className="text-[10px] text-gray-400 font-bold uppercase mb-1 truncate">{cat}</div>
@@ -596,7 +651,7 @@ const App: React.FC = () => {
                     {ACADEMIC_SUBJECTS.map((cat) => (
                       <button
                         key={cat}
-                        onClick={() => setCurrentGame({ mode: GameMode.NECO, category: cat })}
+                        onClick={() => setCurrentGame({ mode: GameMode.NECO, category: cat, difficulty })}
                         className="glass-card p-4 rounded-xl text-left border border-slate-800 hover:border-teal-500/50 transition-all active:scale-[0.98]"
                       >
                         <div className="text-[10px] text-gray-400 font-bold uppercase mb-1 truncate">{cat}</div>
@@ -634,7 +689,7 @@ const App: React.FC = () => {
                     {JSSCE_SUBJECTS.map((cat) => (
                       <button
                         key={cat}
-                        onClick={() => setCurrentGame({ mode: GameMode.JSSCE, category: cat })}
+                        onClick={() => setCurrentGame({ mode: GameMode.JSSCE, category: cat, difficulty })}
                         className="glass-card p-4 rounded-xl text-left border border-slate-800 hover:border-rose-500/50 transition-all active:scale-[0.98]"
                       >
                         <div className="text-[10px] text-gray-400 font-bold uppercase mb-1 truncate">{cat}</div>
@@ -680,7 +735,7 @@ const App: React.FC = () => {
             <div className={`absolute -top-24 -left-24 w-48 h-48 rounded-full blur-[80px] opacity-20 ${summaryStats.won ? 'bg-yellow-500' : 'bg-red-500'}`}></div>
             
             <div className="relative z-10">
-              <div className={`text-5xl mb-4 font-cinzel font-black tracking-tighter ${summaryStats.won ? 'gold-text-gradient' : 'text-red-500'}`}>
+              <div className={`text-2xl sm:text-3xl px-2 mb-4 font-cinzel font-black tracking-[0.15em] leading-tight ${summaryStats.won ? 'gold-text-gradient' : 'text-red-500'}`}>
                 {summaryStats.grade}
               </div>
               
