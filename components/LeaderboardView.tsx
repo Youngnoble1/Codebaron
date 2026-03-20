@@ -18,11 +18,21 @@ const LeaderboardView: React.FC = () => {
     );
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      const leaderboardData = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      } as LeaderboardEntry));
-      setLeaders(leaderboardData);
+      if (snapshot.empty) {
+        // Fallback to mock data if empty
+        const mockLeaders: LeaderboardEntry[] = [
+          { id: '1', username: 'Elite_Warrior', royaltyPoints: 2500, highestScore: 450, avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Elite' },
+          { id: '2', username: 'Trivia_Master', royaltyPoints: 1800, highestScore: 380, avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Master' },
+          { id: '3', username: 'Scholar_Sage', royaltyPoints: 1200, highestScore: 310, avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Sage' },
+        ];
+        setLeaders(mockLeaders);
+      } else {
+        const leaderboardData = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        } as LeaderboardEntry));
+        setLeaders(leaderboardData);
+      }
       setLoading(false);
     }, (err) => {
       console.error("Leaderboard fetch error", err);

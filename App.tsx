@@ -5,7 +5,7 @@ import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { doc, getDoc, setDoc, updateDoc, getDocFromServer } from 'firebase/firestore';
 import { User, GameMode, Category, Difficulty } from './types';
 import { GAME_MODES, TRIVIA_CATEGORIES, ACADEMIC_SUBJECTS, JSSCE_SUBJECTS, ICONS } from './constants';
-import { prewarmCache, isAIActive, getRateLimitStatus, generateWarriorTitle, analyzePerformance } from './services/geminiService';
+import { prewarmCache, isAIActive, getRateLimitStatus } from './services/geminiService';
 import Navigation from './components/Navigation';
 import GameView from './components/GameView';
 import ProfileView from './components/ProfileView';
@@ -112,10 +112,9 @@ const App: React.FC = () => {
     }, 2000);
 
     const unsubscribe = onAuthStateChanged(auth, async (authUser) => {
-      // If we're already a guest, don't let auth state changes overwrite us
-      // unless it's a real user logging in
       if (!authUser) {
-        setUser(prev => prev?.isGuest ? prev : null);
+        // Automatically enter as guest if not logged in
+        handleGuestLogin();
         setLoading(false);
         return;
       }
@@ -129,7 +128,7 @@ const App: React.FC = () => {
         userDocSnap = await getDoc(userDocRef);
       } catch (error) {
         console.error("Failed to fetch user document:", error);
-        setLoginError("Connected to Google, but could not load your profile from the database. You can try again or play as a guest.");
+        handleGuestLogin();
         setLoading(false);
         return;
       }
@@ -140,7 +139,6 @@ const App: React.FC = () => {
       } else {
         console.log("Creating new warrior profile...");
         // Create new profile using Google info if available
-        const title = await generateWarriorTitle(0, 0, 0);
         const newUser: User = {
           id: userId,
           username: authUser.displayName || `Warrior_${userId.substr(-4)}`,
@@ -152,8 +150,7 @@ const App: React.FC = () => {
           avatar: authUser.photoURL || `https://api.dicebear.com/7.x/avataaars/svg?seed=${userId}`,
           playCount: {},
           role: 'player',
-          createdAt: new Date().toISOString(),
-          warriorTitle: title
+          createdAt: new Date().toISOString()
         };
 
         try {
@@ -287,7 +284,7 @@ const App: React.FC = () => {
     }
   };
 
-  const handleGameEnd = async (stats: { score: number; streak: number; won: boolean; grade: string; message: string }) => {
+  const handleGameEnd = (stats: { score: number; streak: number; won: boolean; grade: string; message: string }) => {
     if (!user || !currentGame) return;
 
     const currentCat = currentGame.category || 'General Knowledge';
@@ -297,18 +294,6 @@ const App: React.FC = () => {
     // Recalculate favorite category
     const favCat = Object.entries(newPlayCount).reduce((a, b) => a[1] > b[1] ? a : b, [currentCat, 0])[0] as Category;
 
-    // AI Performance Analysis
-    let finalMessage = stats.message;
-    if (isAIActive()) {
-      const aiFeedback = await analyzePerformance({ 
-        score: stats.score, 
-        streak: stats.streak, 
-        won: stats.won, 
-        category: currentCat 
-      });
-      if (aiFeedback) finalMessage = aiFeedback;
-    }
-
     handleUpdateUser({
       royaltyPoints: user.royaltyPoints + stats.score,
       highestScore: Math.max(user.highestScore, stats.score),
@@ -317,7 +302,7 @@ const App: React.FC = () => {
       favoriteCategory: favCat
     });
 
-    setSummaryStats({ ...stats, message: finalMessage });
+    setSummaryStats(stats);
 
     setCurrentGame(null);
     setShowAcademicMenu(false);
@@ -341,69 +326,7 @@ const App: React.FC = () => {
     );
   }
 
-  if (!user) {
-    return (
-      <div className="min-h-screen bg-[#050b18] flex flex-col items-center justify-center p-8 text-center relative overflow-hidden">
-        {/* Background Accents */}
-        <div className="absolute -top-24 -left-24 w-64 h-64 bg-[#d4af37]/10 rounded-full blur-[100px]"></div>
-        <div className="absolute -bottom-24 -right-24 w-64 h-64 bg-blue-500/10 rounded-full blur-[100px]"></div>
-        
-        <div className="relative z-10 max-w-sm w-full">
-          <div className="mb-12 animate-in zoom-in duration-1000">
-            <div className="w-24 h-24 bg-slate-900 rounded-3xl border-2 border-[#d4af37] flex items-center justify-center mx-auto mb-6 shadow-2xl shadow-yellow-500/20 rotate-12">
-              <ICONS.Trophy className="w-12 h-12 text-[#d4af37]" />
-            </div>
-            <h1 className="text-5xl font-cinzel gold-text-gradient font-black tracking-tighter mb-2">ARKUMEN</h1>
-            <p className="text-gray-500 text-xs tracking-[0.4em] font-bold uppercase">the elite quiz arena</p>
-          </div>
-
-          <div className="glass-card p-8 rounded-3xl border border-[#d4af37]/20 mb-8 animate-in slide-in-from-bottom-8 duration-700">
-            <h2 className="text-xl font-cinzel text-white font-bold mb-4">WELCOME WARRIOR</h2>
-            <p className="text-gray-400 text-sm mb-8 leading-relaxed">
-              Step into the arena where knowledge is power. Sign in to track your legacy, climb the leaderboard, and unlock the AI engine.
-            </p>
-            
-            <button 
-              onClick={handleLogin}
-              className="w-full py-4 gold-gradient text-slate-900 font-bold rounded-xl shadow-xl hover:scale-105 transition-all transform active:scale-95 flex items-center justify-center gap-3"
-            >
-              <ICONS.LogIn className="w-5 h-5" />
-              ENTER THE ARENA
-            </button>
-
-            <button 
-              onClick={handleGuestLogin}
-              className="w-full py-3 bg-slate-800/50 text-slate-300 font-medium rounded-xl border border-slate-700/50 hover:bg-slate-700/50 transition-all flex items-center justify-center gap-3 text-sm"
-            >
-              <ICONS.Users className="w-4 h-4" />
-              CONTINUE AS GUEST
-            </button>
-
-            {loginError && (
-              <div className="mt-4 p-4 bg-red-500/10 border border-red-500/30 rounded-xl text-red-500 text-sm animate-in fade-in slide-in-from-top-2">
-                <div className="flex items-center gap-2 mb-2">
-                  <ICONS.AlertCircle className="w-5 h-5 shrink-0" />
-                  <span className="font-bold">Sign-In Error</span>
-                </div>
-                <p className="mb-3 text-xs opacity-90">{loginError}</p>
-                <div className="text-[10px] space-y-1 opacity-80 border-t border-red-500/20 pt-2">
-                  <p>• Ensure popups are enabled for this site.</p>
-                  <p>• Try opening the app in a new tab if in an iframe.</p>
-                  <p>• Check your internet connection.</p>
-                  <p>• If the issue persists, try clearing your browser cache.</p>
-                </div>
-              </div>
-            )}
-          </div>
-
-          <p className="text-[10px] text-gray-600 uppercase tracking-widest leading-relaxed">
-            By entering, you agree to the terms of the arena.<br/>
-            Powered by Gemini AI Engine
-          </p>
-        </div>
-      </div>
-    );
-  }
+  if (!user) return null;
 
   if (currentGame) {
     if (currentGame.mode === GameMode.MULTIPLAYER) {
@@ -434,11 +357,7 @@ const App: React.FC = () => {
   }
 
   const handleRefreshTitle = async () => {
-    if (!user) return;
-    const newTitle = await generateWarriorTitle(user.royaltyPoints, user.highestScore, user.longestStreak);
-    if (newTitle) {
-      handleUpdateUser({ warriorTitle: newTitle });
-    }
+    // AI Title feature removed as requested
   };
 
   const renderContent = () => {
@@ -453,7 +372,7 @@ const App: React.FC = () => {
             user={user} 
             onUpdateUser={handleUpdateUser} 
             onRefreshTitle={handleRefreshTitle}
-            isAIActive={isAIActive()}
+            isAIActive={false}
           />
         );
       case 'settings':
@@ -465,18 +384,9 @@ const App: React.FC = () => {
               <div>
                 <div className="flex items-center gap-2 mb-1">
                   <h1 className="text-3xl font-cinzel gold-text-gradient font-bold leading-none">ARKUMEN</h1>
-                  {isAIActive() && (
-                    <div className="flex items-center gap-1 px-1.5 py-0.5 bg-green-500/10 border border-green-500/30 rounded text-[8px] font-bold text-green-400 uppercase tracking-tighter animate-in fade-in zoom-in duration-500">
-                      <div className="w-1 h-1 rounded-full bg-green-500 animate-pulse"></div>
-                      AI Active
-                    </div>
-                  )}
                 </div>
                 <div className="flex items-center gap-2">
                   <p className="text-gray-400 text-xs tracking-[0.2em] font-bold uppercase">the elite quiz arena</p>
-                  {user.warriorTitle && (
-                    <span className="text-[10px] text-yellow-500/80 font-cinzel italic border-l border-slate-700 pl-2">{user.warriorTitle}</span>
-                  )}
                 </div>
               </div>
               <div 

@@ -198,58 +198,10 @@ export const researchTopic = async (topic: string, context: string): Promise<str
   }
 };
 
-export const generateWarriorTitle = async (points: number, highScore: number, streak: number): Promise<string> => {
-  const apiKey = process.env.GEMINI_API_KEY || process.env.API_KEY;
-  if (!apiKey || checkRateLimit()) return "Initiate";
-
-  const ai = new GoogleGenAI({ apiKey });
-  try {
-    const response = await ai.models.generateContent({
-      model: 'gemini-3-flash-preview',
-      contents: `Generate a short, epic, 2-3 word "Warrior Title" for a trivia player with these stats:
-      - Royalty Points: ${points}
-      - Highest Score: ${highScore}
-      - Longest Streak: ${streak}
-      
-      The title should sound like it belongs in a high-fantasy arena or elite academy. Examples: "Grand Sage of Logic", "Eternal Streak Master", "Novice Truth-Seeker".
-      Return ONLY the title string.`,
-      config: {
-        systemInstruction: "You are the Grand Master of the Arkumen Arena. You bestow epic titles upon warriors based on their prowess.",
-      }
-    });
-    return response.text?.trim() || "Initiate";
-  } catch (error) {
-    return "Initiate";
-  }
-};
-
-export const analyzePerformance = async (stats: { score: number; streak: number; won: boolean; category: string }): Promise<string> => {
-  const apiKey = process.env.GEMINI_API_KEY || process.env.API_KEY;
-  if (!apiKey || checkRateLimit()) return "";
-
-  const ai = new GoogleGenAI({ apiKey });
-  try {
-    const response = await ai.models.generateContent({
-      model: 'gemini-3-flash-preview',
-      contents: `Analyze this trivia game performance and provide a one-sentence epic feedback or tip:
-      - Score: ${stats.score}
-      - Max Streak: ${stats.streak}
-      - Result: ${stats.won ? 'Victory' : 'Defeat'}
-      - Category: ${stats.category}
-      
-      Keep it under 20 words. Be encouraging but sound like a legendary arena master.`,
-      config: {
-        systemInstruction: "You are the Grand Master of the Arkumen Arena. You provide brief, epic feedback to warriors after their battles.",
-      }
-    });
-    return response.text?.trim() || "";
-  } catch (error) {
-    return "";
-  }
-};
+// AI Warrior Title and Performance Analysis removed as requested
 
 export const isAIActive = (): boolean => {
-  return !!(process.env.GEMINI_API_KEY || process.env.API_KEY);
+  return false; // AI features disabled as requested
 };
 
 export const prewarmCache = async (categories: string[]) => {
