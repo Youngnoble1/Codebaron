@@ -198,10 +198,79 @@ export const researchTopic = async (topic: string, context: string): Promise<str
   }
 };
 
-// AI Warrior Title and Performance Analysis removed as requested
+export const generateWarriorTitle = async (username: string, stats: { royaltyPoints: number; highestScore: number; favoriteCategory: string }): Promise<string> => {
+  const apiKey = process.env.GEMINI_API_KEY || process.env.API_KEY;
+  if (!apiKey || checkRateLimit()) return "Brave Challenger";
+
+  const ai = new GoogleGenAI({ apiKey });
+  try {
+    const response = await ai.models.generateContent({
+      model: 'gemini-3-flash-preview',
+      contents: `Generate a short, epic warrior title (2-4 words) for a trivia player named "${username}". 
+      Stats: ${stats.royaltyPoints} points, highest score ${stats.highestScore}, favorite category: ${stats.favoriteCategory}.
+      The title should sound like a character from an epic RPG or historical legend. 
+      Examples: "The Sage of Science", "The Digital Overlord", "The History Herald".
+      Return ONLY the title string.`,
+      config: {
+        systemInstruction: "You are a creative game designer. Generate epic, short titles for players.",
+      }
+    });
+    return response.text?.trim() || "Brave Challenger";
+  } catch (error: any) {
+    console.error('Title generation error:', error);
+    const isQuota = error?.message?.includes("RESOURCE_EXHAUSTED") || error?.status === "RESOURCE_EXHAUSTED" || error?.code === 429;
+    if (isQuota) setRateLimit(60000);
+    return "Brave Challenger";
+  }
+};
+
+export const analyzePerformance = async (stats: { score: number; streak: number; category: string; won: boolean }): Promise<{ grade: string; message: string }> => {
+  const apiKey = process.env.GEMINI_API_KEY || process.env.API_KEY;
+  if (!apiKey || checkRateLimit()) {
+    return { 
+      grade: stats.score > 500 ? 'A' : (stats.score > 200 ? 'B' : 'C'), 
+      message: stats.won ? "Great victory!" : "Keep practicing!" 
+    };
+  }
+
+  const ai = new GoogleGenAI({ apiKey });
+  try {
+    const response = await ai.models.generateContent({
+      model: 'gemini-3-flash-preview',
+      contents: `Analyze this trivia game performance and provide a grade (S, A, B, C, or D) and a short, encouraging, witty comment (max 15 words).
+      Stats: Score ${stats.score}, Max Streak ${stats.streak}, Category ${stats.category}, Result: ${stats.won ? 'Victory' : 'Defeat'}.
+      Return the result as a JSON object with keys "grade" and "message".`,
+      config: {
+        systemInstruction: "You are a witty, encouraging trivia master. Provide performance feedback in JSON format.",
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            grade: { type: Type.STRING },
+            message: { type: Type.STRING }
+          },
+          required: ["grade", "message"]
+        }
+      }
+    });
+    
+    const text = response.text;
+    if (!text) throw new Error("Empty response");
+    return JSON.parse(text);
+  } catch (error: any) {
+    console.error('Analysis error:', error);
+    const isQuota = error?.message?.includes("RESOURCE_EXHAUSTED") || error?.status === "RESOURCE_EXHAUSTED" || error?.code === 429;
+    if (isQuota) setRateLimit(60000);
+    return { 
+      grade: stats.score > 500 ? 'A' : (stats.score > 200 ? 'B' : 'C'), 
+      message: stats.won ? "Great victory!" : "Keep practicing!" 
+    };
+  }
+};
 
 export const isAIActive = (): boolean => {
-  return false; // AI features disabled as requested
+  const apiKey = process.env.GEMINI_API_KEY || process.env.API_KEY;
+  return !!apiKey && !checkRateLimit();
 };
 
 export const prewarmCache = async (categories: string[]) => {

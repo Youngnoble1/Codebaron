@@ -5,7 +5,7 @@ import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { doc, getDoc, setDoc, updateDoc, getDocFromServer } from 'firebase/firestore';
 import { User, GameMode, Category, Difficulty } from './types';
 import { GAME_MODES, TRIVIA_CATEGORIES, ACADEMIC_SUBJECTS, JSSCE_SUBJECTS, ICONS } from './constants';
-import { prewarmCache, isAIActive, getRateLimitStatus } from './services/geminiService';
+import { prewarmCache, isAIActive, getRateLimitStatus, generateWarriorTitle, analyzePerformance } from './services/geminiService';
 import Navigation from './components/Navigation';
 import GameView from './components/GameView';
 import ProfileView from './components/ProfileView';
@@ -150,8 +150,22 @@ const App: React.FC = () => {
           avatar: authUser.photoURL || `https://api.dicebear.com/7.x/avataaars/svg?seed=${userId}`,
           playCount: {},
           role: 'player',
-          createdAt: new Date().toISOString()
+          createdAt: new Date().toISOString(),
+          warriorTitle: 'Brave Challenger'
         };
+
+        // Generate AI Title if active
+        if (isAIActive()) {
+          generateWarriorTitle(newUser.username, { 
+            royaltyPoints: 0, 
+            highestScore: 0, 
+            favoriteCategory: 'General Knowledge' 
+          }).then(title => {
+            newUser.warriorTitle = title;
+            setDoc(userDocRef, { warriorTitle: title }, { merge: true });
+            setUser(prev => prev?.id === userId ? { ...prev, warriorTitle: title } : prev);
+          });
+        }
 
         try {
           await setDoc(userDocRef, newUser);
@@ -251,6 +265,9 @@ const App: React.FC = () => {
     const updatedUser = { ...user, ...updates };
     setUser(updatedUser);
     
+    // Don't try to update Firestore for guests
+    if (user.isGuest) return;
+    
     try {
       const userDocRef = doc(db, 'users', user.id);
       try {
@@ -284,7 +301,7 @@ const App: React.FC = () => {
     }
   };
 
-  const handleGameEnd = (stats: { score: number; streak: number; won: boolean; grade: string; message: string }) => {
+  const handleGameEnd = async (stats: { score: number; streak: number; won: boolean; grade: string; message: string }) => {
     if (!user || !currentGame) return;
 
     const currentCat = currentGame.category || 'General Knowledge';
@@ -294,6 +311,22 @@ const App: React.FC = () => {
     // Recalculate favorite category
     const favCat = Object.entries(newPlayCount).reduce((a, b) => a[1] > b[1] ? a : b, [currentCat, 0])[0] as Category;
 
+    // AI Analysis if active
+    let finalStats = stats;
+    if (isAIActive()) {
+      try {
+        const analysis = await analyzePerformance({
+          score: stats.score,
+          streak: stats.streak,
+          category: currentCat,
+          won: stats.won
+        });
+        finalStats = { ...stats, ...analysis };
+      } catch (e) {
+        console.warn("AI Analysis failed", e);
+      }
+    }
+
     handleUpdateUser({
       royaltyPoints: user.royaltyPoints + stats.score,
       highestScore: Math.max(user.highestScore, stats.score),
@@ -302,7 +335,7 @@ const App: React.FC = () => {
       favoriteCategory: favCat
     });
 
-    setSummaryStats(stats);
+    setSummaryStats(finalStats);
 
     setCurrentGame(null);
     setShowAcademicMenu(false);
@@ -372,7 +405,7 @@ const App: React.FC = () => {
             user={user} 
             onUpdateUser={handleUpdateUser} 
             onRefreshTitle={handleRefreshTitle}
-            isAIActive={false}
+            isAIActive={isAIActive()}
           />
         );
       case 'settings':
@@ -384,9 +417,18 @@ const App: React.FC = () => {
               <div>
                 <div className="flex items-center gap-2 mb-1">
                   <h1 className="text-3xl font-cinzel gold-text-gradient font-bold leading-none">ARKUMEN</h1>
+                  {isAIActive() && (
+                    <div className="flex items-center gap-1 bg-emerald-500/10 border border-emerald-500/20 px-1.5 py-0.5 rounded animate-pulse">
+                      <div className="w-1 h-1 bg-emerald-400 rounded-full"></div>
+                      <span className="text-[8px] font-bold text-emerald-400 uppercase tracking-tighter">AI Active</span>
+                    </div>
+                  )}
                 </div>
                 <div className="flex items-center gap-2">
                   <p className="text-gray-400 text-xs tracking-[0.2em] font-bold uppercase">the elite quiz arena</p>
+                  {user.warriorTitle && (
+                    <span className="text-[10px] text-[#d4af37] font-cinzel italic opacity-80 border-l border-slate-800 pl-2">{user.warriorTitle}</span>
+                  )}
                 </div>
               </div>
               <div 

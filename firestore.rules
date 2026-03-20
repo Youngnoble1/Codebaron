@@ -43,16 +43,19 @@ service cloud.firestore {
     }
 
     function isValidUser(data) {
-      return data.id is string && 
-             data.username is string && 
-             data.royaltyPoints is number && 
-             data.highestScore is number && 
-             data.longestStreak is number && 
-             data.favoriteCategory is string &&
-             data.avatar is string &&
-             data.playCount is map &&
+      return (data.id is string || !('id' in data)) && 
+             (data.username is string || !('username' in data)) && 
+             (data.royaltyPoints is number || !('royaltyPoints' in data)) && 
+             (data.highestScore is number || !('highestScore' in data)) && 
+             (data.longestStreak is number || !('longestStreak' in data)) && 
+             (data.favoriteCategory is string || !('favoriteCategory' in data)) &&
+             (data.avatar is string || !('avatar' in data)) &&
+             (data.playCount is map || !('playCount' in data)) &&
              (!('role' in data) || data.role in ['player', 'admin']) &&
-             (!('createdAt' in data) || data.createdAt is string);
+             (!('createdAt' in data) || data.createdAt is string) &&
+             (!('email' in data) || data.email is string) &&
+             (!('warriorTitle' in data) || data.warriorTitle is string) &&
+             (!('isGuest' in data) || data.isGuest is bool);
     }
 
     function isValidLeaderboardEntry(data) {
