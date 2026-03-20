@@ -6,10 +6,13 @@ import { ICONS, CATEGORIES } from '../constants';
 interface ProfileViewProps {
   user: User;
   onUpdateUser: (updates: Partial<User>) => void;
+  onRefreshTitle: () => Promise<void>;
+  isAIActive: boolean;
 }
 
-const ProfileView: React.FC<ProfileViewProps> = ({ user, onUpdateUser }) => {
+const ProfileView: React.FC<ProfileViewProps> = ({ user, onUpdateUser, onRefreshTitle, isAIActive }) => {
   const [isEditing, setIsEditing] = useState(false);
+  const [isRefreshingTitle, setIsRefreshingTitle] = useState(false);
   const [editedUsername, setEditedUsername] = useState(user.username);
   const [editedAvatar, setEditedAvatar] = useState(user.avatar);
   const [showAvatarInput, setShowAvatarInput] = useState(false);
@@ -114,7 +117,28 @@ const ProfileView: React.FC<ProfileViewProps> = ({ user, onUpdateUser }) => {
               )}
             </div>
           ) : (
-            <h2 className="text-2xl font-bold tracking-tight">{user.username}</h2>
+            <div className="flex flex-col items-center">
+              <h2 className="text-2xl font-bold tracking-tight">{user.username}</h2>
+              {user.warriorTitle && (
+                <div className="flex items-center gap-2 mt-1">
+                  <p className="text-[#d4af37] font-cinzel italic text-sm tracking-wide">{user.warriorTitle}</p>
+                  {isAIActive && (
+                    <button 
+                      onClick={async () => {
+                        setIsRefreshingTitle(true);
+                        await onRefreshTitle();
+                        setIsRefreshingTitle(false);
+                      }}
+                      disabled={isRefreshingTitle}
+                      className={`p-1 rounded-full hover:bg-white/5 transition-colors ${isRefreshingTitle ? 'animate-spin' : ''}`}
+                      title="Refresh AI Title"
+                    >
+                      <ICONS.RefreshCw className="w-3 h-3 text-gray-500" />
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
           )}
           <p className="text-gray-500 text-sm mt-1">{user.email}</p>
         </div>

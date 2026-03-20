@@ -69,6 +69,7 @@ export interface User {
   role?: 'player' | 'admin';
   createdAt?: any;
   isGuest?: boolean;
+  warriorTitle?: string;
 }
 
 export interface GameState {

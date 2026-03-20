@@ -5,7 +5,7 @@ import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { doc, getDoc, setDoc, updateDoc, getDocFromServer } from 'firebase/firestore';
 import { User, GameMode, Category, Difficulty } from './types';
 import { GAME_MODES, TRIVIA_CATEGORIES, ACADEMIC_SUBJECTS, JSSCE_SUBJECTS, ICONS } from './constants';
-import { prewarmCache, isAIActive, getRateLimitStatus } from './services/geminiService';
+import { prewarmCache, isAIActive, getRateLimitStatus, generateWarriorTitle, analyzePerformance } from './services/geminiService';
 import Navigation from './components/Navigation';
 import GameView from './components/GameView';
 import ProfileView from './components/ProfileView';
@@ -140,6 +140,7 @@ const App: React.FC = () => {
       } else {
         console.log("Creating new warrior profile...");
         // Create new profile using Google info if available
+        const title = await generateWarriorTitle(0, 0, 0);
         const newUser: User = {
           id: userId,
           username: authUser.displayName || `Warrior_${userId.substr(-4)}`,
@@ -151,7 +152,8 @@ const App: React.FC = () => {
           avatar: authUser.photoURL || `https://api.dicebear.com/7.x/avataaars/svg?seed=${userId}`,
           playCount: {},
           role: 'player',
-          createdAt: new Date().toISOString()
+          createdAt: new Date().toISOString(),
+          warriorTitle: title
         };
 
         try {
@@ -285,7 +287,7 @@ const App: React.FC = () => {
     }
   };
 
-  const handleGameEnd = (stats: { score: number; streak: number; won: boolean; grade: string; message: string }) => {
+  const handleGameEnd = async (stats: { score: number; streak: number; won: boolean; grade: string; message: string }) => {
     if (!user || !currentGame) return;
 
     const currentCat = currentGame.category || 'General Knowledge';
@@ -295,6 +297,18 @@ const App: React.FC = () => {
     // Recalculate favorite category
     const favCat = Object.entries(newPlayCount).reduce((a, b) => a[1] > b[1] ? a : b, [currentCat, 0])[0] as Category;
 
+    // AI Performance Analysis
+    let finalMessage = stats.message;
+    if (isAIActive()) {
+      const aiFeedback = await analyzePerformance({ 
+        score: stats.score, 
+        streak: stats.streak, 
+        won: stats.won, 
+        category: currentCat 
+      });
+      if (aiFeedback) finalMessage = aiFeedback;
+    }
+
     handleUpdateUser({
       royaltyPoints: user.royaltyPoints + stats.score,
       highestScore: Math.max(user.highestScore, stats.score),
@@ -303,7 +317,7 @@ const App: React.FC = () => {
       favoriteCategory: favCat
     });
 
-    setSummaryStats(stats);
+    setSummaryStats({ ...stats, message: finalMessage });
 
     setCurrentGame(null);
     setShowAcademicMenu(false);
@@ -419,6 +433,14 @@ const App: React.FC = () => {
     );
   }
 
+  const handleRefreshTitle = async () => {
+    if (!user) return;
+    const newTitle = await generateWarriorTitle(user.royaltyPoints, user.highestScore, user.longestStreak);
+    if (newTitle) {
+      handleUpdateUser({ warriorTitle: newTitle });
+    }
+  };
+
   const renderContent = () => {
     switch (activeTab) {
       case 'leaderboard':
@@ -426,7 +448,14 @@ const App: React.FC = () => {
       case 'library':
         return <LibraryView />;
       case 'profile':
-        return <ProfileView user={user} onUpdateUser={handleUpdateUser} />;
+        return (
+          <ProfileView 
+            user={user} 
+            onUpdateUser={handleUpdateUser} 
+            onRefreshTitle={handleRefreshTitle}
+            isAIActive={isAIActive()}
+          />
+        );
       case 'settings':
         return <SettingsView user={user} onUpdateUser={handleUpdateUser} onLogout={handleLogout} />;
       default:
@@ -443,7 +472,12 @@ const App: React.FC = () => {
                     </div>
                   )}
                 </div>
-                <p className="text-gray-400 text-xs tracking-[0.2em] font-bold uppercase">the elite quiz arena</p>
+                <div className="flex items-center gap-2">
+                  <p className="text-gray-400 text-xs tracking-[0.2em] font-bold uppercase">the elite quiz arena</p>
+                  {user.warriorTitle && (
+                    <span className="text-[10px] text-yellow-500/80 font-cinzel italic border-l border-slate-700 pl-2">{user.warriorTitle}</span>
+                  )}
+                </div>
               </div>
               <div 
                 onClick={() => setActiveTab('profile')}
