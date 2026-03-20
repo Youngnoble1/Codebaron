@@ -2,10 +2,10 @@
 import React, { useState, useEffect } from 'react';
 import { db, auth, googleProvider, signInWithPopup } from './firebase';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
-import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, updateDoc, getDocFromServer } from 'firebase/firestore';
 import { User, GameMode, Category, Difficulty } from './types';
 import { GAME_MODES, TRIVIA_CATEGORIES, ACADEMIC_SUBJECTS, JSSCE_SUBJECTS, ICONS } from './constants';
-import { prewarmCache, isAIActive } from './services/geminiService';
+import { prewarmCache, isAIActive, getRateLimitStatus } from './services/geminiService';
 import Navigation from './components/Navigation';
 import GameView from './components/GameView';
 import ProfileView from './components/ProfileView';
@@ -83,15 +83,39 @@ const App: React.FC = () => {
   const [isResearching, setIsResearching] = useState(false);
   const [researchContent, setResearchContent] = useState<string | null>(null);
   const [summaryStats, setSummaryStats] = useState<{ score: number; streak: number; won: boolean; grade: string; message: string } | null>(null);
+  const [rateLimit, setRateLimit] = useState<{ isRateLimited: boolean; remainingMs: number }>({ isRateLimited: false, remainingMs: 0 });
+  const [loginError, setLoginError] = useState<string | null>(null);
 
   // Initialize Guest User
   useEffect(() => {
+    // Test Firestore connection
+    const testConnection = async () => {
+      try {
+        await getDocFromServer(doc(db, 'test', 'connection'));
+        console.log("Firestore connection successful.");
+      } catch (error: any) {
+        if (error.message && error.message.includes('the client is offline')) {
+          console.error("Firestore is offline. Check your Firebase configuration.");
+        }
+      }
+    };
+    testConnection();
+
     // Pre-warm cache for common categories immediately
-    prewarmCache(['General Knowledge', 'Science & Nature', 'History', 'Geography', 'Mathematics', 'Physics', 'Chemistry', 'Biology']);
+    // We reduced this to avoid hitting Gemini API quota limits on startup
+    prewarmCache(['General Knowledge', 'Mathematics', 'Science & Nature']);
+
+    // Monitor rate limit status
+    const rateLimitInterval = setInterval(() => {
+      const status = getRateLimitStatus();
+      setRateLimit({ isRateLimited: status.isRateLimited, remainingMs: status.remainingMs });
+    }, 2000);
 
     const unsubscribe = onAuthStateChanged(auth, async (authUser) => {
+      // If we're already a guest, don't let auth state changes overwrite us
+      // unless it's a real user logging in
       if (!authUser) {
-        setUser(null);
+        setUser(prev => prev?.isGuest ? prev : null);
         setLoading(false);
         return;
       }
@@ -105,7 +129,9 @@ const App: React.FC = () => {
         userDocSnap = await getDoc(userDocRef);
       } catch (error) {
         console.error("Failed to fetch user document:", error);
-        handleFirestoreError(error, OperationType.GET, `users/${userId}`);
+        setLoginError("Connected to Google, but could not load your profile from the database. You can try again or play as a guest.");
+        setLoading(false);
+        return;
       }
 
       if (userDocSnap && userDocSnap.exists()) {
@@ -113,16 +139,16 @@ const App: React.FC = () => {
         setUser(userDocSnap.data() as User);
       } else {
         console.log("Creating new warrior profile...");
-        // Create new guest profile
+        // Create new profile using Google info if available
         const newUser: User = {
           id: userId,
-          username: `Warrior_${userId.substr(-4)}`,
-          email: '',
+          username: authUser.displayName || `Warrior_${userId.substr(-4)}`,
+          email: authUser.email || '',
           royaltyPoints: 0,
           highestScore: 0,
           longestStreak: 0,
           favoriteCategory: 'General Knowledge',
-          avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${userId}`,
+          avatar: authUser.photoURL || `https://api.dicebear.com/7.x/avataaars/svg?seed=${userId}`,
           playCount: {},
           role: 'player',
           createdAt: new Date().toISOString()
@@ -156,15 +182,59 @@ const App: React.FC = () => {
       setLoading(false);
     });
 
-    return () => unsubscribe();
+    return () => {
+      unsubscribe();
+      clearInterval(rateLimitInterval);
+    };
   }, []);
 
   const handleLogin = async () => {
+    setLoginError(null);
+    console.log("Initiating Google Sign-In...");
     try {
-      await signInWithPopup(auth, googleProvider);
-    } catch (error) {
-      console.error("Login failed:", error);
+      const result = await signInWithPopup(auth, googleProvider);
+      console.log("Login successful:", result.user.uid);
+    } catch (error: any) {
+      console.error("Login failed with code:", error.code);
+      console.error("Full error object:", error);
+      
+      let message = "Login failed. Please try again.";
+      if (error.code === 'auth/popup-blocked') {
+        message = "Login popup was blocked. Please allow popups for this site.";
+      } else if (error.code === 'auth/popup-closed-by-user') {
+        message = "Login popup was closed before completion.";
+      } else if (error.code === 'auth/cancelled-popup-request') {
+        message = "Only one login popup can be open at a time.";
+      } else if (error.code === 'auth/internal-error') {
+        message = "Internal authentication error. Try again later.";
+      } else if (error.code === 'auth/unauthorized-domain') {
+        message = "This domain is not authorized for Firebase Auth. Please check your Firebase console.";
+      } else if (error.message) {
+        message = `${error.message} (${error.code})`;
+      }
+      setLoginError(message);
     }
+  };
+
+  const handleGuestLogin = () => {
+    console.log("Entering as Guest...");
+    const guestId = `guest_${Math.random().toString(36).substr(2, 9)}`;
+    const guestUser: User = {
+      id: guestId,
+      username: `Guest_Warrior_${guestId.substr(-4)}`,
+      email: '',
+      royaltyPoints: 0,
+      highestScore: 0,
+      longestStreak: 0,
+      favoriteCategory: 'General Knowledge',
+      avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${guestId}`,
+      playCount: {},
+      role: 'player',
+      createdAt: new Date().toISOString(),
+      isGuest: true
+    };
+    setUser(guestUser);
+    setLoading(false);
   };
 
   const handleLogout = async () => {
@@ -286,6 +356,30 @@ const App: React.FC = () => {
               <ICONS.LogIn className="w-5 h-5" />
               ENTER THE ARENA
             </button>
+
+            <button 
+              onClick={handleGuestLogin}
+              className="w-full py-3 bg-slate-800/50 text-slate-300 font-medium rounded-xl border border-slate-700/50 hover:bg-slate-700/50 transition-all flex items-center justify-center gap-3 text-sm"
+            >
+              <ICONS.Users className="w-4 h-4" />
+              CONTINUE AS GUEST
+            </button>
+
+            {loginError && (
+              <div className="mt-4 p-4 bg-red-500/10 border border-red-500/30 rounded-xl text-red-500 text-sm animate-in fade-in slide-in-from-top-2">
+                <div className="flex items-center gap-2 mb-2">
+                  <ICONS.AlertCircle className="w-5 h-5 shrink-0" />
+                  <span className="font-bold">Sign-In Error</span>
+                </div>
+                <p className="mb-3 text-xs opacity-90">{loginError}</p>
+                <div className="text-[10px] space-y-1 opacity-80 border-t border-red-500/20 pt-2">
+                  <p>• Ensure popups are enabled for this site.</p>
+                  <p>• Try opening the app in a new tab if in an iframe.</p>
+                  <p>• Check your internet connection.</p>
+                  <p>• If the issue persists, try clearing your browser cache.</p>
+                </div>
+              </div>
+            )}
           </div>
 
           <p className="text-[10px] text-gray-600 uppercase tracking-widest leading-relaxed">
@@ -726,6 +820,19 @@ const App: React.FC = () => {
 
   return (
     <div className="min-h-screen relative max-w-md mx-auto bg-[#050b18] overflow-x-hidden border-x border-slate-800 shadow-[0_0_100px_rgba(212,175,55,0.05)]">
+      {rateLimit.isRateLimited && (
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[150] w-[90%] max-w-sm animate-in fade-in slide-in-from-top-4 duration-500">
+          <div className="glass-card p-3 rounded-xl border border-yellow-500/50 bg-yellow-500/10 backdrop-blur-md flex items-center gap-3 shadow-lg shadow-yellow-500/10">
+            <div className="p-2 bg-yellow-500/20 rounded-lg">
+              <ICONS.SettingsIcon className="w-4 h-4 text-yellow-500 animate-spin-slow" />
+            </div>
+            <div className="flex-1">
+              <div className="text-[10px] font-bold text-yellow-500 uppercase tracking-wider">AI Quota Limit</div>
+              <div className="text-xs text-gray-300">AI is cooling down. Using static questions for {Math.ceil(rateLimit.remainingMs / 1000)}s.</div>
+            </div>
+          </div>
+        </div>
+      )}
       {renderContent()}
 
       {summaryStats && (

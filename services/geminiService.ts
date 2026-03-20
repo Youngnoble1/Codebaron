@@ -63,6 +63,30 @@ const setCache = (key: string, questions: Question[]) => {
   }
 };
 
+// Global rate limit state
+let isRateLimited = false;
+let rateLimitResetTime = 0;
+
+export const getRateLimitStatus = () => ({
+  isRateLimited,
+  resetTime: rateLimitResetTime,
+  remainingMs: Math.max(0, rateLimitResetTime - Date.now())
+});
+
+const checkRateLimit = (): boolean => {
+  if (isRateLimited && Date.now() < rateLimitResetTime) {
+    return true;
+  }
+  isRateLimited = false;
+  return false;
+};
+
+const setRateLimit = (durationMs: number = 60000) => {
+  isRateLimited = true;
+  rateLimitResetTime = Date.now() + durationMs;
+  console.warn(`[AI] Rate limit encountered. Pausing AI tasks for ${durationMs / 1000}s`);
+};
+
 export const fetchQuestions = async (
   count: number,
   category?: Category,
@@ -96,19 +120,23 @@ export const fetchQuestions = async (
     
     // Background fetch fresh ones to keep the pool updated if API key exists
     const apiKey = process.env.GEMINI_API_KEY || process.env.API_KEY;
-    if (apiKey) {
+    if (apiKey && !checkRateLimit()) {
       // Only fetch if cache is low (less than 30 questions)
       if (cachedQuestions.length < 30) {
         // Delay background fetch to avoid burst
         setTimeout(() => {
+          if (checkRateLimit()) return;
           fetchFreshQuestions(10, category, difficulty, mode)
             .then(fresh => {
               const updatedCache = [...cachedQuestions, ...fresh];
               const unique = Array.from(new Map(updatedCache.map(q => [q.text, q])).values());
               setCache(cacheKey, unique);
             })
-            .catch(() => {});
-        }, 5000);
+            .catch((e) => {
+              const isQuota = e?.message?.includes("RESOURCE_EXHAUSTED") || e?.status === "RESOURCE_EXHAUSTED" || e?.code === 429;
+              if (isQuota) setRateLimit(120000); 
+            });
+        }, 15000); // Increased delay
       }
     }
 
@@ -117,7 +145,7 @@ export const fetchQuestions = async (
 
   // 2. If pool is small and API key exists, fetch from AI
   const apiKey = process.env.GEMINI_API_KEY || process.env.API_KEY;
-  if (apiKey) {
+  if (apiKey && !checkRateLimit()) {
     try {
       const fetchCount = Math.max(count, 15);
       const fresh = await fetchFreshQuestions(fetchCount, category, difficulty, mode);
@@ -144,6 +172,11 @@ export const researchTopic = async (topic: string, context: string): Promise<str
   if (!apiKey) {
     return `### ${topic}\n\n*Educational summary is currently unavailable because the AI service is not configured.*\n\n**Topic Context:** ${context}\n\nTo enable AI research, please configure your Gemini API key in the environment variables.`;
   }
+  
+  if (checkRateLimit()) {
+    return `### ${topic}\n\n*AI Research is temporarily paused due to API quota limits. Please try again in a few minutes.*\n\n**Topic Context:** ${context}`;
+  }
+
   const ai = new GoogleGenAI({ apiKey });
   try {
     const response = await ai.models.generateContent({
@@ -157,8 +190,10 @@ export const researchTopic = async (topic: string, context: string): Promise<str
       }
     });
     return response.text || "No research data found.";
-  } catch (error) {
+  } catch (error: any) {
     console.error('Research error:', error);
+    const isQuota = error?.message?.includes("RESOURCE_EXHAUSTED") || error?.status === "RESOURCE_EXHAUSTED" || error?.code === 429;
+    if (isQuota) setRateLimit(60000);
     return "Failed to fetch research data. Please try again later.";
   }
 };
@@ -168,23 +203,34 @@ export const isAIActive = (): boolean => {
 };
 
 export const prewarmCache = async (categories: string[]) => {
-  // Fetch questions for each category sequentially with a delay to avoid rate limits
-  for (const cat of categories) {
+  // Only pre-warm if AI is active and not rate limited
+  if (!isAIActive() || checkRateLimit()) return;
+
+  // Fetch questions for each category sequentially with a long delay to avoid rate limits
+  // We only pre-warm a few essential categories to save quota
+  const essentialCategories = categories.slice(0, 3); 
+
+  for (const cat of essentialCategories) {
     try {
+      if (checkRateLimit()) break;
+
       // Check if we already have enough in cache
       const cacheKey = `${cat}_${Difficulty.EASY}`;
       const cached = getCache(cacheKey);
-      if (cached.length >= 15) continue;
+      if (cached.length >= 10) continue;
 
-      const fresh = await fetchFreshQuestions(15, cat as Category, Difficulty.EASY);
+      const fresh = await fetchFreshQuestions(10, cat as Category, Difficulty.EASY);
       const updated = [...cached, ...fresh];
       const unique = Array.from(new Map(updated.map(q => [q.text, q])).values());
       setCache(cacheKey, unique);
       
-      // Wait 3 seconds between categories to be safe with RPM limits
-      await new Promise(resolve => setTimeout(resolve, 3000));
-    } catch (e) {
-      // Ignore errors in background pre-warming
+      // Wait 15 seconds between categories to be very safe with RPM limits
+      await new Promise(resolve => setTimeout(resolve, 15000));
+    } catch (e: any) {
+      if (e?.message?.includes("RESOURCE_EXHAUSTED") || e?.status === "RESOURCE_EXHAUSTED" || e?.code === 429) {
+        setRateLimit(300000); // 5 minutes pause on pre-warm error
+        break;
+      }
     }
   }
 };
@@ -278,6 +324,10 @@ const fetchFreshQuestions = async (
     } catch (error: any) {
       const isQuotaError = error?.message?.includes("RESOURCE_EXHAUSTED") || error?.status === "RESOURCE_EXHAUSTED" || error?.code === 429;
       
+      if (isQuotaError) {
+        setRateLimit(120000); // 2 minutes pause on any quota error
+      }
+
       console.error(`Attempt ${attempt + 1} failed:`, error);
       
       if (attempt === retries) {

@@ -68,6 +68,7 @@ export interface User {
   playCount: Record<string, number>;
   role?: 'player' | 'admin';
   createdAt?: any;
+  isGuest?: boolean;
 }
 
 export interface GameState {
