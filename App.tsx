@@ -231,7 +231,14 @@ const App: React.FC = () => {
 
   const handleGuestLogin = () => {
     console.log("Entering as Guest...");
-    const guestId = `guest_${Math.random().toString(36).substr(2, 9)}`;
+    
+    // Check for existing guest ID in localStorage
+    let guestId = localStorage.getItem('arkumen_guest_id');
+    if (!guestId) {
+      guestId = `guest_${Math.random().toString(36).substr(2, 9)}`;
+      localStorage.setItem('arkumen_guest_id', guestId);
+    }
+    
     const guestUser: User = {
       id: guestId,
       username: `Guest_Warrior_${guestId.substr(-4)}`,

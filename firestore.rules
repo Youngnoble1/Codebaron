@@ -73,7 +73,7 @@ service cloud.firestore {
     }
 
     match /leaderboard/{userId} {
-      allow read: if isAuthenticated();
+      allow read: if true;
       allow create, update: if isOwner(userId) && isValidLeaderboardEntry(request.resource.data);
     }
 
