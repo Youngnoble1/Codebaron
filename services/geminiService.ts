@@ -268,6 +268,26 @@ export const analyzePerformance = async (stats: { score: number; streak: number;
   }
 };
 
+export const testAIConnection = async (): Promise<{ success: boolean; message: string }> => {
+  const apiKey = process.env.GEMINI_API_KEY || process.env.API_KEY;
+  if (!apiKey) return { success: false, message: "API Key missing in environment." };
+
+  const ai = new GoogleGenAI({ apiKey });
+  try {
+    const response = await ai.models.generateContent({
+      model: 'gemini-3-flash-preview',
+      contents: "Respond with 'Connected' if you can hear me.",
+    });
+    if (response.text?.includes('Connected')) {
+      return { success: true, message: "AI Connection Successful!" };
+    }
+    return { success: false, message: "AI responded but format was unexpected." };
+  } catch (error: any) {
+    console.error("AI Test Failed:", error);
+    return { success: false, message: error.message || "Connection failed." };
+  }
+};
+
 export const isAIActive = (): boolean => {
   const apiKey = process.env.GEMINI_API_KEY || process.env.API_KEY;
   return !!apiKey && !checkRateLimit();

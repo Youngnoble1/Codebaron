@@ -1,8 +1,8 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { User } from '../types';
 import { ICONS } from '../constants';
-import { isAIActive } from '../services/geminiService';
+import { isAIActive, testAIConnection } from '../services/geminiService';
 
 interface SettingsViewProps {
   user: User;
@@ -11,6 +11,13 @@ interface SettingsViewProps {
 }
 
 const SettingsView: React.FC<SettingsViewProps> = ({ user, onUpdateUser, onLogout }) => {
+  const [testStatus, setTestStatus] = useState<{ loading: boolean; result: string | null }>({ loading: false, result: null });
+
+  const handleTestConnection = async () => {
+    setTestStatus({ loading: true, result: null });
+    const result = await testAIConnection();
+    setTestStatus({ loading: false, result: result.message });
+  };
   return (
     <div className="min-h-screen bg-[#050b18] text-white p-6 pb-32">
       <div className="flex justify-between items-center mb-8">
@@ -66,6 +73,23 @@ const SettingsView: React.FC<SettingsViewProps> = ({ user, onUpdateUser, onLogou
               : "Link a Gemini API key in AI Studio Secrets to unlock unlimited AI-generated questions and advanced research."}
           </p>
           <div className="grid grid-cols-1 gap-3">
+            <button 
+              onClick={handleTestConnection}
+              disabled={testStatus.loading}
+              className={`w-full py-3 rounded-xl font-bold transition-all flex items-center justify-center gap-2 border ${
+                testStatus.result?.includes('Successful') 
+                  ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30' 
+                  : 'bg-slate-800 text-gray-300 border-slate-700 hover:bg-slate-700'
+              }`}
+            >
+              {testStatus.loading ? (
+                <ICONS.RefreshCw className="w-4 h-4 animate-spin" />
+              ) : (
+                <ICONS.ShieldCheck className="w-4 h-4" />
+              )}
+              {testStatus.loading ? 'TESTING...' : (testStatus.result || 'TEST AI CONNECTION')}
+            </button>
+
             <button 
               onClick={() => {
                 Object.keys(localStorage).forEach(key => {

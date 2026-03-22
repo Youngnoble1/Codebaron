@@ -27,7 +27,8 @@ import {
   Search,
   Download,
   Library,
-  RefreshCw
+  RefreshCw,
+  ShieldCheck
 } from 'lucide-react';
 import { Category, GameMode } from './types';
 
@@ -188,7 +189,8 @@ export const ICONS = {
   Search,
   Download,
   Library,
-  RefreshCw
+  RefreshCw,
+  ShieldCheck
 };
 
 export const REVELATIONS_QUESTIONS = [
