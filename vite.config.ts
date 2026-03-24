@@ -4,10 +4,16 @@ import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 
 export default defineConfig(({ mode }) => {
-  // Load env file based on `mode` in the current working directory.
-  // Set the third parameter to '' to load all env regardless of the `VITE_` prefix.
   const env = loadEnv(mode, process.cwd(), '');
   
+  // Find all keys that look like API keys or Gemini keys
+  const envToExpose = Object.keys(env).reduce((acc, key) => {
+    if (key.toUpperCase().includes('API') || key.toUpperCase().includes('GEMINI')) {
+      acc[key] = env[key];
+    }
+    return acc;
+  }, {} as Record<string, string>);
+
   return {
     plugins: [
       react(),
@@ -17,8 +23,7 @@ export default defineConfig(({ mode }) => {
       hmr: false,
     },
     define: {
-      'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY || process.env.GEMINI_API_KEY || ''),
-      'process.env.API_KEY': JSON.stringify(env.API_KEY || process.env.API_KEY || '')
+      'process.env': JSON.stringify(envToExpose)
     }
   };
 });

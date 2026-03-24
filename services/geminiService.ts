@@ -289,7 +289,16 @@ export const testAIConnection = async (): Promise<{ success: boolean; message: s
 };
 
 export const isAIActive = (): boolean => {
-  const apiKey = process.env.GEMINI_API_KEY || process.env.API_KEY || (import.meta as any).env?.VITE_GEMINI_API_KEY;
+  // Case-insensitive search for the API key in process.env
+  const envKeys = Object.keys(process.env);
+  const foundKeyName = envKeys.find(k => 
+    k.toUpperCase() === 'GEMINI_API_KEY' || 
+    k.toUpperCase() === 'API_KEY' ||
+    (k.toUpperCase().includes('GEMINI') && k.toUpperCase().includes('API'))
+  );
+  
+  const apiKey = foundKeyName ? process.env[foundKeyName] : (import.meta as any).env?.VITE_GEMINI_API_KEY;
+  
   const isActive = !!apiKey && apiKey !== 'undefined' && apiKey !== 'null' && apiKey.trim() !== '' && !checkRateLimit();
   if (!isActive && apiKey) {
     console.warn("[AI] API Key found but AI is inactive. Key length:", apiKey.length, "Rate limited:", checkRateLimit());

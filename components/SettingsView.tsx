@@ -129,6 +129,22 @@ const SettingsView: React.FC<SettingsViewProps> = ({ user, onUpdateUser, onLogou
           </div>
         </section>
 
+        <section className="glass-card p-6 rounded-2xl border border-white/5">
+          <h2 className="text-[10px] font-bold tracking-widest text-gray-500 uppercase mb-4">System Debugger</h2>
+          <div className="space-y-2">
+            <div className="flex justify-between text-[10px]">
+              <span className="text-gray-500">Detected Keys:</span>
+              <span className="text-emerald-400 font-mono">
+                {Object.keys(process.env).filter(k => k.toUpperCase().includes('API') || k.toUpperCase().includes('GEMINI')).join(', ') || 'None'}
+              </span>
+            </div>
+            <div className="flex justify-between text-[10px]">
+              <span className="text-gray-500">Vite Mode:</span>
+              <span className="text-gray-400 font-mono">{(import.meta as any).env?.MODE}</span>
+            </div>
+          </div>
+        </section>
+
         <section className="glass-card p-6 rounded-2xl border border-red-500/10">
           <h2 className="text-sm font-bold tracking-widest text-red-400 uppercase mb-4">Danger Zone</h2>
           <p className="text-xs text-gray-500 mb-4">Once you delete your local data, there is no going back. Please be certain.</p>
