@@ -289,8 +289,12 @@ export const testAIConnection = async (): Promise<{ success: boolean; message: s
 };
 
 export const isAIActive = (): boolean => {
-  const apiKey = process.env.GEMINI_API_KEY || process.env.API_KEY;
-  return !!apiKey && !checkRateLimit();
+  const apiKey = process.env.GEMINI_API_KEY || process.env.API_KEY || (import.meta as any).env?.VITE_GEMINI_API_KEY;
+  const isActive = !!apiKey && apiKey !== 'undefined' && apiKey !== 'null' && apiKey.trim() !== '' && !checkRateLimit();
+  if (!isActive && apiKey) {
+    console.warn("[AI] API Key found but AI is inactive. Key length:", apiKey.length, "Rate limited:", checkRateLimit());
+  }
+  return isActive;
 };
 
 export const prewarmCache = async (categories: string[]) => {

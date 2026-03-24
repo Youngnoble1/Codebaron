@@ -57,10 +57,21 @@ const SettingsView: React.FC<SettingsViewProps> = ({ user, onUpdateUser, onLogou
             </div>
             <div>
               <label className="block text-[10px] text-gray-500 uppercase font-bold mb-1">AI Status</label>
-              <div className={`p-3 rounded-lg border text-sm font-bold flex items-center gap-2 ${isAIActive() ? 'bg-green-500/10 border-green-500/30 text-green-400' : 'bg-red-500/10 border-red-500/30 text-red-400'}`}>
-                <div className={`w-2 h-2 rounded-full ${isAIActive() ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`}></div>
+              <div className={`p-3 rounded-lg border text-sm font-bold flex items-center gap-2 ${isAIActive() ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' : 'bg-red-500/10 border-red-500/30 text-red-400'}`}>
+                <div className={`w-2 h-2 rounded-full ${isAIActive() ? 'bg-emerald-500 animate-pulse' : 'bg-red-500'}`}></div>
                 {isAIActive() ? 'ACTIVE (Unlimited Questions Enabled)' : 'INACTIVE (Using Static Bank)'}
               </div>
+              {!isAIActive() && (
+                <div className="mt-2 space-y-1">
+                  <p className="text-[10px] text-gray-500 italic">
+                    Tip: Ensure GEMINI_API_KEY is set in AI Studio Secrets and refresh.
+                  </p>
+                  <p className="text-[10px] text-gray-600">
+                    Debug: Key detected: {process.env.GEMINI_API_KEY ? 'YES' : 'NO'} 
+                    {process.env.GEMINI_API_KEY && ` (Length: ${process.env.GEMINI_API_KEY.length})`}
+                  </p>
+                </div>
+              )}
             </div>
           </div>
         </section>
