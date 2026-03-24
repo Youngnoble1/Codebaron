@@ -81,8 +81,18 @@ const SettingsView: React.FC<SettingsViewProps> = ({ user, onUpdateUser, onLogou
           <p className="text-xs text-gray-500 mb-4">
             {isAIActive() 
               ? "Your Gemini API key is linked! You have access to unlimited, fresh questions across all subjects." 
-              : "Link a Gemini API key in AI Studio Secrets to unlock unlimited AI-generated questions and advanced research."}
+              : "Link a Gemini API key in AI Studio Secrets to unlock unlimited AI-generated questions."}
           </p>
+          {!isAIActive() && (
+            <a 
+              href="https://aistudio.google.com/app/apikey" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="text-[10px] text-yellow-500 hover:underline mb-4 block font-bold"
+            >
+              GET AN API KEY HERE →
+            </a>
+          )}
           <div className="grid grid-cols-1 gap-3">
             <button 
               onClick={handleTestConnection}
